@@ -32,8 +32,9 @@
 
 ## Bot-opened PRs
 
-- Events created with `GITHUB_TOKEN` start no workflows, so a PR the bot opens gets no CI on its own. `sync-pairings.yml` shows the pattern: after the whole PR block, `gh workflow run ci.yml --ref "$BRANCH"` with `actions: write` on the job, retried up to three times inside an `if` condition (which `bash -e` does not abort on), then a named failure message. A dispatch placed before `gh pr create` can fail and leave a pushed branch with no PR
+- Events created with `GITHUB_TOKEN` start no workflows, so a PR the bot opens gets no CI on its own. `sync-pairings.yml` shows the pattern: after the whole PR block, `gh workflow run ci.yml --ref "$BRANCH"` with `actions: write` in the workflow permissions, retried up to three times inside an `if` condition (which `bash -e` does not abort on), then a named failure message. A dispatch placed before `gh pr create` can fail and leave a pushed branch with no PR
 - If PR creation fails with `GitHub Actions is not permitted to create or approve pull requests`, the branch is pushed and the PR is missing. The setting has enterprise, organisation and repository levels; a greyed-out repository checkbox means the organisation policy is off. Check the repository value with `gh api repos/<owner>/<repo>/actions/permissions/workflow`
+
 ## Previews
 
 - Open the preview URL in a fresh tab or hard-reload first; the channel reuses one URL per PR, and a tab left open across a push requests chunks that no longer exist
