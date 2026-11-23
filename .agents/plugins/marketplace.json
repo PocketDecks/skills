@@ -1,0 +1,21 @@
+{
+  "name": "pocketdecks",
+  "interface": {
+    "displayName": "PocketDecks"
+  },
+  "plugins": [
+    {
+      "name": "pocketdecks-skills",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/PocketDecks/skills.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

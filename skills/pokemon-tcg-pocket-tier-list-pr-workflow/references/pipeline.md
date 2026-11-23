@@ -12,13 +12,12 @@
 - When asked what a PR touched, separate references from data. `git fetch`, `gh api` reads and a frozen install fetch no data; a download, a pairing sync or a pipeline run does. Say which ran
 - After a rebuild, prove the generated data reaches its consumer: `yarn build` must prerender and pass `verify-dist-html`, and a browser-rendered `/tier-list` must show `/deck/` links. Deck counts and image parity alone do not show the ranking survived
 - When only one published file should change, diff every other file in `public/data/` against `git show HEAD:<path>` and require them byte-identical, then diff the changed file field by field and check row order
-- In a merge conflict on generated data, keep `main`'s version unless the change is meant to move that file. A rebuild touches unrelated rankings, images and timestamps
 - Stage OG image changes with `git add -A public/og/deck`, so renamed decks land their deletions and additions in the same commit
 
 ## Writing files and recovering
 
 - Write pipeline JSON through `writeArtefacts` (`analysis/src/utils/write-artifacts.ts`), which stages each target as `<target>.tmp`, swaps through `<target>.bak` and marks new targets with `<target>.created`. A plain `writeFileSync` truncates the target before it can fail and loses the previous snapshot
-- After an interrupted write, never restore or delete staging files from their suffixes, and never treat a clean `yarn store:verify` as proof that the files came from one write. Stop writers, preserve an untouched copy of `analysis/data/` and ask the maintainer to approve a specific recovery, as the recovery section of `docs/reference/analysis-pipeline.md` sets out
+- After an interrupted write, never restore or delete staging files from their suffixes, and never treat a clean `yarn store:verify` (from `analysis/`) as proof that the files came from one write. Stop writers, preserve an untouched copy of `analysis/data/` and ask the maintainer to approve a specific recovery, as the recovery section of `docs/reference/analysis-pipeline.md` sets out
 - A change to the write protocol is incomplete until every passage that lists the staging files agrees with it: the scheduled refresh guide, `docs/reference/analysis-pipeline.md`, `docs/tutorial/running-pipeline-updates.md` and the `store:verify` reporting
 - OG images stage beside the target and publish by renaming the live directory to `<target>.previous`, then the staging directory into place (`analysis/src/utils/generate-og-images.ts`). Scan for leftovers beside the target, never in `os.tmpdir()`, which can sit on another volume
 - When a downloader updates two files that form one logical pair, stage both complete payloads before replacing either, and test with an injected failure on the second replacement that both old targets come back

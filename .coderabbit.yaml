@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-GB"
+tone_instructions: "Direct and demanding, never rude. British English. A few high-conviction comments beat many nits. Explain the failure scenario behind each finding."
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+
+  high_level_summary: false
+  high_level_summary_in_walkthrough: false
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: false
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  suggested_reviewers: false
+  in_progress_fortune: false
+  poem: false
+  review_status: true
+  commit_status: true
+
+  auto_review:
+    enabled: false
+    drafts: false
+
+  path_filters:
+    - "!**/LICENSE"
+    - "!CODE_OF_CONDUCT.md"
+    - "!skills/index.json"
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        House rules that apply to every file:
+        - British English ("normalise", "colour", "behaviour"), straight quotes and no em dashes.
+        - Commits and PR titles are a single Conventional Commits subject line. Do not ask for commit bodies.
+        - This repository is published. Flag anything private: local or home directory paths, personal email addresses, internal hostnames, tokens, and names of private tools or agents.
+        - Judge structure, not just local correctness: duplicated rules that will drift apart, files that grow past their purpose, and indirection that adds nothing.
+    - path: "skills/**"
+      instructions: |
+        Agent skills read by a model. Each rule must be checkable and phrased as an instruction, not as history ("in PR 123 we ..."). Flag rules that contradict each other across SKILL.md and references/, vague advice an agent cannot act on, and claims about the target repository that are stated without a file, command or symbol to check them against. SKILL.md must name every reference file it expects the agent to load, and each reference must be reachable from SKILL.md. The frontmatter description decides when the skill triggers: flag wording that would make it fire on unrelated requests or miss the requests it lists.
+    - path: "scripts/**"
+      instructions: |
+        The validator gates every pull request. It must fail closed: an unreadable file, a missing manifest or malformed JSON is a reported problem, never a silent pass. Every check needs a node --test case that fails when the check is removed.
+    - path: "**/*.test.mjs"
+      instructions: |
+        Tests must assert observable behaviour. A test that cannot fail when the check it covers is deleted is a finding.
+    - path: ".github/workflows/**"
+      instructions: |
+        Pin every action to a full commit SHA with a version comment, keep permissions read-only unless a job needs more, and give every job a timeout-minutes value.
+    - path: "evals/**"
+      instructions: |
+        Trigger evals. Should-trigger queries must read like real requests and cover different phrasings. Should-not-trigger queries must be near-misses that share words with the skill; flag negatives that are trivially unrelated.
+    - path: "{plugin.json,package.json,skills.sh.json}"
+      instructions: |
+        Hermes Agent (plugin.json, Agent Plugins v1) and Command Code (package.json, commandcode.skills) manifests, and skills.sh groupings. Name, version and licence must match .claude-plugin/plugin.json; package.json stays private; every skill in skills/ appears in exactly one grouping.
+    - path: ".claude-plugin/**"
+      instructions: |
+        Claude Code plugin and marketplace manifests. The plugin name and version must match .codex-plugin/plugin.json.
+    - path: ".codex-plugin/**"
+      instructions: |
+        Codex plugin manifest. The name and version must match .claude-plugin/plugin.json, and skills must point at ./skills/.
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    description:
+      mode: "off"
+    title:
+      mode: "warning"
+      requirements: "A single Conventional Commits subject line: type(scope): summary, in British English, imperative mood, lower case after the colon, no trailing full stop."
+    issue_assessment:
+      mode: "warning"
+
+  tools:
+    biome:
+      enabled: false
+    languagetool:
+      enabled: true
+      level: "default"
+    markdownlint:
+      enabled: true
+    actionlint:
+      enabled: true
+
+knowledge_base:
+  learnings:
+    scope: "local"
+
+chat:
+  auto_reply: true
+  art: false

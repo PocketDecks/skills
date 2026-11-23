@@ -11,12 +11,12 @@ Archetype names come from Limitless set pages, scraped into `analysis/src/data/l
 - The scraper exits non-zero when any page fails, a page duplicates another set's page, a slug has an unknown set code or nothing was fetched. One failed page keeps that set's previous snapshot in the file, but the run still fails so the refresh job stops
 - A new set can list very few archetypes; a set with one row is not proof of a truncated scrape. Check the Limitless page before assuming one
 - Before redesigning the store over a claimed data loss, check whether the rows are in the store. A loss at name-resolution time is not a scrape defect
-- After a reviewer flags a referenced-but-undeclared variable in this script, verify with a grep for the declaration and `node --check`. An uncaught `ReferenceError` in a `catch` block aborts the whole run and defeats the per-set error isolation
+- Before trusting a variable this script reads in an error path, grep for its declaration and run `node --check`. An uncaught `ReferenceError` in a `catch` block aborts the whole run and defeats the per-set error isolation
 
 ## The matcher
 
 - A listing row is a candidate only when the deck holds every card the row names, matched by card name so reprints still match. Containment is necessary but not enough. Real decks run tech Basics as two-ofs, and a popular listing made of them would otherwise outname the centrepiece
-- Ranking is `compareRank` in `get-deck-name.ts`. Read it before reasoning about a name; the order of its signals has changed before and will again
+- Ranking is `compareRank` in `get-deck-name.ts`. Read it before reasoning about a name, since the order of its signals is not fixed
 - Fix naming with general signals, never with per-pair special cases. Each exception narrows the next case and the set never converges
 - A card that another card in the deck evolves from is support, not the lead, so Magneton never outnames Magnezone
 - Archetypes Limitless never lists are seeded in `SEEDED_ARCHETYPES`. A deck that matches nothing goes to the `UNMATCHED_DECK` bucket (`"unmatched-deck"`), which counts in field shares and is dropped from published rows; `docs/reference/pipeline-output-contract.md` explains why
@@ -36,7 +36,6 @@ Archetype names come from Limitless set pages, scraped into `analysis/src/data/l
 
 - `.github/workflows/sync-pairings.yml` runs weekly, commits only the listing store to `automated/pairings-<date>`, runs the analysis typecheck and tests, and opens a PR, as a draft when those checks fail. Because the golden reads the live store, a week that changes a listing usually arrives as a draft with the golden test failing
 - To finish such a PR, check out its branch in a scratch worktree, install `analysis/` from its lockfile, run `yarn golden:generate`, read the diff as above, and push the regenerated fixture to the same branch when asked
-- Bot-opened PRs do not trigger workflows on their own, so the job dispatches `ci.yml` for the branch after the PR step. The Preview workflow does not start from the bot's own push
 - The weekly sync and the local refresh both rewrite the listing store and the golden, so a pairings PR can arrive already superseded. Before resolving conflicts, list them without touching the worktree (`git merge-tree --write-tree --name-only origin/main <branch>`), then compare content rather than diff size: load both versions of the store and compare `(set, slug) -> count`. No key the branch adds and no count the branch raises means the branch is stale
 - Prove the branch is empty instead of asserting it. Merge `origin/main`, take `main`'s store, regenerate the golden and diff the whole tree against `origin/main`. An empty diff means the PR adds nothing; ask whether to close it or to rerun the sync on top of `main`, because closing discards nothing while a rerun replaces the PR's content
 - A rerun that prints no change is a finding, not a failure. It confirms from the other side that `main` already carries everything the live site lists

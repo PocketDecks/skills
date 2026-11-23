@@ -43,7 +43,7 @@ How to change files without collateral churn, repair local history, and resolve 
 
 - Preview conflicts without touching the worktree: `git merge-tree --write-tree --name-only origin/main <branch>`
 - Translation passes rewrite whole locale files, so feature branches that carry translations conflict on them repeatedly. When such a branch cannot rebase cleanly, recreate it once instead of cascading PRs: branch from `origin/main`, take the branch's version of files `main` has not changed since the branch point (`git show <old-branch>:<path> > <path>`), apply the branch's key changes onto `main`'s version of files both sides changed with a script, run the gates, and open one replacement PR. Carry hand-written translations over verbatim; never regenerate or drop them
-- In generated data, keep `main`'s version unless the change is meant to move that file
+- In a conflict on generated data, keep `main`'s version unless the change is meant to move that file. A rebuild touches unrelated rankings, images and timestamps
 
 ## Notices and licences
 

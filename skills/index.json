@@ -1,0 +1,25 @@
+{
+  "skills": [
+    {
+      "name": "pokemon-tcg-pocket-tier-list-pr-workflow",
+      "version": "6caba7baa3c9",
+      "files": [
+        "LICENSE",
+        "SKILL.md",
+        "references/card-data.md",
+        "references/ci-and-deploys.md",
+        "references/deck-naming.md",
+        "references/delegation-and-handoffs.md",
+        "references/frontend.md",
+        "references/gates-and-environment.md",
+        "references/git-and-editing.md",
+        "references/locales-and-prerender.md",
+        "references/pipeline.md",
+        "references/scoring-and-windows.md",
+        "references/test-integrity.md",
+        "references/testing-quirks.md",
+        "scripts/probe-dist-route.js"
+      ]
+    }
+  ]
+}
