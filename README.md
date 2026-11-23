@@ -18,6 +18,7 @@ See [install.md](install.md) for Claude Code, Codex, OpenCode, Command Code, Her
 | `skills/` | One folder per skill, plus `index.json`, the OpenCode catalogue |
 | `evals/` | Trigger evals for each skill, see [evals/README.md](evals/README.md) |
 | `scripts/validate-skills.mjs` | Checks frontmatter, links, manifests, the catalogue, the evals and the published text |
+| `scripts/bump-version.mjs` | Sets the release version in all four plugin manifests |
 | `.claude-plugin/` | Claude Code plugin and marketplace manifests |
 | `.codex-plugin/`, `.agents/plugins/` | Codex plugin manifest and marketplace |
 | `.opencode/` | OpenCode project config for this repository |
