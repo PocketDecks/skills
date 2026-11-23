@@ -43,11 +43,26 @@ const MIN_EVALS_PER_SIDE = 8;
 
 // Prose of a Markdown file, without fenced code, inline code and link targets,
 // so identifiers such as `color-scheme` or a `--write-catalog` flag stay allowed.
+// A fence closes only on the same character, at least as long, with nothing after it.
+const withoutFences = (markdown) => {
+  const kept = [];
+  let fence = null;
+  for (const line of markdown.split("\n")) {
+    if (fence === null) {
+      const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+      if (open) fence = open[1];
+      else kept.push(line);
+    } else if (new RegExp(`^[ \\t]*${fence[0]}{${fence.length},}[ \\t]*$`).test(line)) {
+      fence = null;
+    }
+  }
+  return kept.join("\n");
+};
+
 export const proseOf = (markdown) =>
-  markdown
-    .replace(/^([ \t]*)(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\2[^\n]*$/gm, "")
+  withoutFences(markdown)
     .replace(/`[^`\n]*`/g, "")
-    .replace(/\]\([^)\s]*\)/g, "]");
+    .replace(/\]\([^)\s]*(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\)/g, "]");
 
 const toPosix = (relative) => relative.split(path.sep).join("/");
 
@@ -98,7 +113,7 @@ export const parseFrontmatter = (text) => {
     const pair = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
     if (!pair) continue;
     const [, key, value] = pair;
-    if (/^[>|](?:[1-9]?[-+]?|[-+][1-9])$/.test(value)) {
+    if (/^[>|](?:[1-9]?[-+]?|[-+][1-9])(?:\s+#.*)?$/.test(value)) {
       blockKey = key;
       folded = value.startsWith(">");
     } else {
