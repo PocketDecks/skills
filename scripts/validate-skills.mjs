@@ -1,0 +1,272 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 PocketDecks
+
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const SKILLS_DIR = "skills";
+const EVALS_DIR = "evals";
+const CATALOG = path.join(SKILLS_DIR, "index.json");
+const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const ALLOWED_FRONTMATTER = new Set(["name", "description", "license", "allowed-tools", "metadata", "compatibility"]);
+const ALLOWED_ROOT_HIDDEN = new Set([
+  ".git",
+  ".github",
+  ".agents",
+  ".claude-plugin",
+  ".codex-plugin",
+  ".opencode",
+  ".coderabbit.yaml",
+  ".gitattributes",
+  ".gitignore",
+  ".nvmrc",
+]);
+const VERBATIM_TEXTS = new Set(["LICENSE", "CODE_OF_CONDUCT.md"]);
+const TEXT_EXTENSIONS = new Set([".md", ".json", ".js", ".mjs", ".cjs", ".ts", ".yml", ".yaml", ".txt", ""]);
+const TYPOGRAPHIC = new RegExp(`[${[0x2014, 0x2018, 0x2019, 0x201c, 0x201d].map((code) => String.fromCodePoint(code)).join("")}]`);
+const HOME_PATH = /(?:\/(?:var\/)?home\/[a-z_][\w-]*\/|\/Users\/[^/\s]+\/|[A-Za-z]:\\Users\\)/;
+const MIN_EVALS_PER_SIDE = 8;
+
+const toPosix = (relative) => relative.split(path.sep).join("/");
+
+const walk = (root, relative = "") => {
+  const entries = [];
+  for (const dirent of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
+    const child = path.join(relative, dirent.name);
+    if (dirent.name === ".git" || dirent.name === "node_modules") continue;
+    entries.push({ relative: toPosix(child), dirent });
+    if (dirent.isDirectory()) entries.push(...walk(root, child));
+  }
+  return entries;
+};
+
+export const parseFrontmatter = (text) => {
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  if (!match) return null;
+  const fields = {};
+  let blockKey = null;
+  let blockLines = [];
+  let folded = false;
+  const closeBlock = () => {
+    if (blockKey === null) return;
+    fields[blockKey] = folded ? blockLines.join(" ").trim() : blockLines.join("\n").trim();
+    blockKey = null;
+    blockLines = [];
+  };
+  for (const line of match[1].split("\n")) {
+    if (blockKey !== null && /^\s+\S/.test(line)) {
+      blockLines.push(line.trim());
+      continue;
+    }
+    closeBlock();
+    const pair = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
+    if (!pair) continue;
+    const [, key, value] = pair;
+    if (/^[>|][-+]?$/.test(value)) {
+      blockKey = key;
+      folded = value.startsWith(">");
+    } else {
+      fields[key] = value.replace(/^(["'])(.*)\1$/, "$2");
+    }
+  }
+  closeBlock();
+  return fields;
+};
+
+const skillNames = (root) => {
+  const dir = path.join(root, SKILLS_DIR);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
+    .sort();
+};
+
+const skillFiles = (root, name) =>
+  walk(root, path.join(SKILLS_DIR, name))
+    .filter(({ dirent }) => dirent.isFile())
+    .map(({ relative }) => relative.slice(`${SKILLS_DIR}/${name}/`.length))
+    .sort();
+
+export const buildCatalog = (root) => ({
+  skills: skillNames(root).map((name) => {
+    const files = skillFiles(root, name);
+    const hash = crypto.createHash("sha256");
+    for (const file of files) {
+      hash.update(`${file}\0`);
+      hash.update(fs.readFileSync(path.join(root, SKILLS_DIR, name, file)));
+      hash.update("\0");
+    }
+    return { name, version: hash.digest("hex").slice(0, 12), files };
+  }),
+});
+
+const readJson = (root, relative, problems) => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
+  } catch (error) {
+    problems.push(`${relative}: ${error.code === "ENOENT" ? "missing" : `invalid JSON (${error.message})`}`);
+    return null;
+  }
+};
+
+const checkSkill = (root, name, problems) => {
+  const where = `${SKILLS_DIR}/${name}/SKILL.md`;
+  if (!NAME_PATTERN.test(name) || name.length > 64) {
+    problems.push(`${SKILLS_DIR}/${name}: folder name must match ${NAME_PATTERN} and be at most 64 characters`);
+  }
+  const file = path.join(root, where);
+  if (!fs.existsSync(file)) {
+    problems.push(`${where}: missing`);
+    return;
+  }
+  const fields = parseFrontmatter(fs.readFileSync(file, "utf8"));
+  if (!fields) {
+    problems.push(`${where}: no frontmatter block`);
+    return;
+  }
+  for (const key of Object.keys(fields)) {
+    if (!ALLOWED_FRONTMATTER.has(key)) problems.push(`${where}: unexpected frontmatter key "${key}"`);
+  }
+  if (fields.name !== name) problems.push(`${where}: name "${fields.name ?? ""}" must equal the folder name "${name}"`);
+  const description = fields.description ?? "";
+  if (!description) problems.push(`${where}: description is missing`);
+  if (description.length > 1024) problems.push(`${where}: description is ${description.length} characters, over 1024`);
+  if (/[<>]/.test(description)) problems.push(`${where}: description contains an angle bracket`);
+  if ((fields.compatibility ?? "").length > 500) problems.push(`${where}: compatibility is over 500 characters`);
+  if (fields.license !== "AGPL-3.0-or-later") problems.push(`${where}: license must be AGPL-3.0-or-later`);
+  if (!fs.existsSync(path.join(root, SKILLS_DIR, name, "LICENSE"))) problems.push(`${SKILLS_DIR}/${name}/LICENSE: missing`);
+};
+
+const checkLinks = (root, entries, problems) => {
+  for (const { relative, dirent } of entries) {
+    if (!dirent.isFile() || !relative.endsWith(".md") || VERBATIM_TEXTS.has(path.posix.basename(relative))) continue;
+    const text = fs.readFileSync(path.join(root, relative), "utf8");
+    for (const [, target] of text.matchAll(/\]\(([^)\s]+)\)/g)) {
+      if (/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(target)) continue;
+      const resolved = path.join(root, path.dirname(relative), decodeURI(target.split("#")[0]));
+      if (!fs.existsSync(resolved)) problems.push(`${relative}: link target "${target}" does not exist`);
+    }
+  }
+};
+
+const checkTree = (root, entries, problems) => {
+  for (const { relative, dirent } of entries) {
+    const base = path.posix.basename(relative);
+    if (dirent.isSymbolicLink()) problems.push(`${relative}: symlinks are not allowed`);
+    if (base.startsWith(".")) {
+      const topLevel = !relative.includes("/");
+      const underAllowedRoot = [...ALLOWED_ROOT_HIDDEN].some((entry) => relative.startsWith(`${entry}/`));
+      if (topLevel ? !ALLOWED_ROOT_HIDDEN.has(base) : !underAllowedRoot) {
+        problems.push(`${relative}: hidden file or folder outside the allowed list`);
+      }
+    }
+    if (!dirent.isFile() || !TEXT_EXTENSIONS.has(path.posix.extname(relative))) continue;
+    const text = fs.readFileSync(path.join(root, relative), "utf8");
+    if (text.includes("\r")) problems.push(`${relative}: CR line endings`);
+    if (HOME_PATH.test(text)) problems.push(`${relative}: contains a local home directory path`);
+    if (!VERBATIM_TEXTS.has(base) && TYPOGRAPHIC.test(text)) {
+      problems.push(`${relative}: contains an em dash or a curly quote`);
+    }
+  }
+};
+
+const checkManifests = (root, problems) => {
+  const claude = readJson(root, ".claude-plugin/plugin.json", problems);
+  const claudeMarket = readJson(root, ".claude-plugin/marketplace.json", problems);
+  const codex = readJson(root, ".codex-plugin/plugin.json", problems);
+  const codexMarket = readJson(root, ".agents/plugins/marketplace.json", problems);
+  const opencode = readJson(root, ".opencode/opencode.json", problems);
+  if (!claude || !claudeMarket || !codex || !codexMarket || !opencode) return;
+  if (claude.name !== codex.name) problems.push(`plugin names differ: "${claude.name}" and "${codex.name}"`);
+  if (claude.version !== codex.version) problems.push(`plugin versions differ: "${claude.version}" and "${codex.version}"`);
+  if (!NAME_PATTERN.test(codex.name ?? "") || codex.name.length > 64) problems.push(".codex-plugin/plugin.json: invalid name");
+  if (!/^\d+\.\d+\.\d+$/.test(codex.version ?? "")) problems.push(".codex-plugin/plugin.json: version must be MAJOR.MINOR.PATCH");
+  if (codex.skills !== `./${SKILLS_DIR}/`) problems.push(`.codex-plugin/plugin.json: skills must be "./${SKILLS_DIR}/"`);
+  const ui = codex.interface ?? {};
+  for (const [field, limit] of [["displayName", 30], ["shortDescription", 30], ["longDescription", 4000], ["developerName", 80]]) {
+    if (typeof ui[field] !== "string" || !ui[field] || ui[field].length > limit) {
+      problems.push(`.codex-plugin/plugin.json: interface.${field} must be 1 to ${limit} characters`);
+    }
+  }
+  if (!claudeMarket.plugins?.some((plugin) => plugin.name === claude.name && plugin.source === "./")) {
+    problems.push(`.claude-plugin/marketplace.json: no entry for "${claude.name}" with source "./"`);
+  }
+  if (!codexMarket.plugins?.some((plugin) => plugin.name === codex.name)) {
+    problems.push(`.agents/plugins/marketplace.json: no entry for "${codex.name}"`);
+  }
+  if (!opencode.skills?.includes(`./${SKILLS_DIR}`)) problems.push(`.opencode/opencode.json: skills must list "./${SKILLS_DIR}"`);
+};
+
+const checkCatalog = (root, problems) => {
+  const expected = JSON.stringify(buildCatalog(root), null, 2);
+  const file = path.join(root, CATALOG);
+  const actual = fs.existsSync(file) ? fs.readFileSync(file, "utf8").trim() : "";
+  if (actual !== expected) problems.push(`${CATALOG}: out of date, run node scripts/validate-skills.mjs --write-catalog`);
+};
+
+const checkEvals = (root, names, problems) => {
+  const dir = path.join(root, EVALS_DIR);
+  const evalNames = fs.existsSync(dir)
+    ? fs.readdirSync(dir, { withFileTypes: true }).filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name)
+    : [];
+  for (const name of evalNames) {
+    if (!names.includes(name)) problems.push(`${EVALS_DIR}/${name}: no skill with that name`);
+  }
+  for (const name of names) {
+    const relative = `${EVALS_DIR}/${name}/trigger-evals.json`;
+    const items = readJson(root, relative, problems);
+    if (!items) continue;
+    if (!Array.isArray(items)) {
+      problems.push(`${relative}: must be an array`);
+      continue;
+    }
+    const seen = new Set();
+    let positive = 0;
+    let negative = 0;
+    items.forEach((item, index) => {
+      if (typeof item?.query !== "string" || !item.query.trim() || typeof item.should_trigger !== "boolean") {
+        problems.push(`${relative}: item ${index} needs a non-empty query and a boolean should_trigger`);
+        return;
+      }
+      const key = item.query.trim().toLowerCase();
+      if (seen.has(key)) problems.push(`${relative}: item ${index} repeats an earlier query`);
+      seen.add(key);
+      if (item.should_trigger) positive += 1;
+      else negative += 1;
+    });
+    if (positive < MIN_EVALS_PER_SIDE || negative < MIN_EVALS_PER_SIDE) {
+      problems.push(`${relative}: needs at least ${MIN_EVALS_PER_SIDE} should-trigger and ${MIN_EVALS_PER_SIDE} should-not-trigger queries`);
+    }
+  }
+};
+
+export const validate = (root) => {
+  const problems = [];
+  const names = skillNames(root);
+  if (names.length === 0) problems.push(`${SKILLS_DIR}: no skills found`);
+  const entries = walk(root);
+  for (const name of names) checkSkill(root, name, problems);
+  checkLinks(root, entries, problems);
+  checkTree(root, entries, problems);
+  checkManifests(root, problems);
+  checkCatalog(root, problems);
+  checkEvals(root, names, problems);
+  return problems;
+};
+
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  const args = process.argv.slice(2);
+  const root = path.resolve(args.find((arg) => !arg.startsWith("--")) ?? path.join(path.dirname(fileURLToPath(import.meta.url)), ".."));
+  if (args.includes("--write-catalog")) {
+    fs.writeFileSync(path.join(root, CATALOG), `${JSON.stringify(buildCatalog(root), null, 2)}\n`);
+  }
+  const problems = validate(root);
+  for (const problem of problems) console.error(problem);
+  console.log(problems.length === 0 ? "ok: no problems found" : `${problems.length} problem(s) found`);
+  process.exitCode = problems.length === 0 ? 0 : 1;
+}
