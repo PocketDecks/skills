@@ -1,0 +1,22 @@
+[
+  {"query": "coderabbit left 3 comments on my tier list PR (#203), can you go through them and fix whatever is actually valid", "should_trigger": true},
+  {"query": "why is CI red on PocketDecks/pokemon-tcg-pocket-tier-list? the analysis job failed on the last push to my branch", "should_trigger": true},
+  {"query": "the weekly sync-pairings PR is a draft because the analysis tests failed, regenerate the naming golden and push it to the same branch", "should_trigger": true},
+  {"query": "pocketdecks.top shows Darkrai ex with a weird Power Score this week, can you work out from the committed data why it ranks so high", "should_trigger": true},
+  {"query": "add a Polish locale route to the PTCGP tier list site, with the prerendered pages and the sitemap entries", "should_trigger": true},
+  {"query": "dependabot bumped pokemon-tcg-pocket-cards to a new major in the tier list repo and the build check is failing, sort it out", "should_trigger": true},
+  {"query": "review PR 207 on the pokemon tcg pocket tier list repo, it touches the deck page and the consent banner colours", "should_trigger": true},
+  {"query": "the scheduled refresh stopped at step 9 with needs-person, what do I do next and is the dated branch safe to delete", "should_trigger": true},
+  {"query": "QA found that the statistics page on the preview deploy says NaN for a couple of decks, find out which window file is wrong", "should_trigger": true},
+  {"query": "write the regression test for the deck cut bug in analysis/ and prove it fails on the old code before you push", "should_trigger": true},
+  {"query": "what's the best Mewtwo ex deck in Pokemon TCG Pocket right now? I keep losing to Pikachu", "should_trigger": false},
+  {"query": "help me build a 60 card Charizard deck for the physical Pokemon TCG, standard format", "should_trigger": false},
+  {"query": "how do I set up branch protection with required checks on a new GitHub repo in general", "should_trigger": false},
+  {"query": "explain how CodeRabbit's path_instructions work in a .coderabbit.yaml file", "should_trigger": false},
+  {"query": "I'm building my own Pokemon TCG Pocket deck tracker in Flutter, how should I structure the card database", "should_trigger": false},
+  {"query": "scrape Limitless TCG tournament results for the physical game into a CSV for my spreadsheet", "should_trigger": false},
+  {"query": "my GitHub Actions workflow in a different repo can't create pull requests, what permission is missing", "should_trigger": false},
+  {"query": "write a Vitest test for a React hook that debounces a search input", "should_trigger": false},
+  {"query": "which Pokemon TCG Pocket expansion should I spend my pack hourglasses on next", "should_trigger": false},
+  {"query": "set up Firebase Hosting preview channels for my Vite app from scratch", "should_trigger": false}
+]
