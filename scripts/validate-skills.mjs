@@ -27,7 +27,27 @@ const VERBATIM_TEXTS = new Set(["LICENSE", "CODE_OF_CONDUCT.md"]);
 const TEXT_EXTENSIONS = new Set([".md", ".json", ".js", ".mjs", ".cjs", ".ts", ".yml", ".yaml", ".txt", ""]);
 const TYPOGRAPHIC = new RegExp(`[${[0x2014, 0x2018, 0x2019, 0x201c, 0x201d].map((code) => String.fromCodePoint(code)).join("")}]`);
 const HOME_PATH = /(?:\/(?:var\/)?home\/[a-z_][\w-]*\/|\/Users\/[^/\s]+\/|[A-Za-z]:\\Users\\)/;
+const US_SPELLING = new RegExp(
+  [
+    String.raw`\b(?:organi|recogni|normali|initiali|seriali|prioriti|summari|customi|optimi|minimi|maximi|authori|finali|utili|categori|synchroni|saniti|locali|standardi|visuali|emphasi|speciali|memori|characteri|generali|stabili|tokeni|parameteri|apologi)z(?:e|es|ed|ing|ation|ations)\b`,
+    String.raw`\banalyz(?:e|es|ed|ing)\b`,
+    String.raw`\b(?:color|behavior|favor|honor|flavor|neighbor)(?:s|ed|ing|al|ite|ites)?\b`,
+    String.raw`\bcent(?:er|ers|ered)\b`,
+    String.raw`\bcatalog(?:s|ed)?\b`,
+    String.raw`\b(?:canceled|canceling|labeled|labeling|modeled|modeling|traveled|traveling)\b`,
+    String.raw`\bgray\b`,
+  ].join("|"),
+  "i",
+);
 const MIN_EVALS_PER_SIDE = 8;
+
+// Prose of a Markdown file, without fenced code, inline code and link targets,
+// so identifiers such as `color-scheme` or a `--write-catalog` flag stay allowed.
+export const proseOf = (markdown) =>
+  markdown
+    .replace(/^([ \t]*)(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\2[^\n]*$/gm, "")
+    .replace(/`[^`\n]*`/g, "")
+    .replace(/\]\([^)\s]*\)/g, "]");
 
 const toPosix = (relative) => relative.split(path.sep).join("/");
 
@@ -194,6 +214,10 @@ const checkTree = (root, entries, problems) => {
     const text = fs.readFileSync(path.join(root, relative), "utf8");
     if (text.includes("\r")) problems.push(`${relative}: CR line endings`);
     if (HOME_PATH.test(text)) problems.push(`${relative}: contains a local home directory path`);
+    if (!VERBATIM_TEXTS.has(base) && path.posix.extname(relative) === ".md") {
+      const spelling = US_SPELLING.exec(proseOf(text));
+      if (spelling) problems.push(`${relative}: US spelling "${spelling[0]}", use British English`);
+    }
     if (!VERBATIM_TEXTS.has(base) && TYPOGRAPHIC.test(text)) {
       problems.push(`${relative}: contains an em dash or a curly quote`);
     }

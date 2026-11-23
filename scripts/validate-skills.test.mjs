@@ -8,7 +8,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildCatalog, parseFrontmatter, validate } from "./validate-skills.mjs";
+import { buildCatalog, parseFrontmatter, proseOf, validate } from "./validate-skills.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skill = "pokemon-tcg-pocket-tier-list-pr-workflow";
@@ -113,6 +113,23 @@ test("rejects a hidden file inside a skill", () => {
 
 test("rejects an em dash in skill text", () => {
   expectProblem(problemsAfter((root) => edit(root, skillMd, (text) => `${text}\nOne ${String.fromCodePoint(0x2014)} two\n`)), /em dash or a curly quote/);
+});
+
+test("rejects a US spelling in skill prose", () => {
+  const reference = path.join("skills", skill, "references", "frontend.md");
+  for (const word of ["normalize", "colors", "behavior", "catalog", "centered", "analyzing", "labeled", "gray"]) {
+    expectProblem(problemsAfter((root) => edit(root, reference, (text) => `${text}\nThis line says ${word}.\n`)), new RegExp(`frontend.md: US spelling "${word}"`));
+  }
+});
+
+test("allows US spellings in code, link targets and verbatim texts", () => {
+  const prose = proseOf("Use `color-scheme` and [the guide](https://example.com/catalog).\n\n- Step:\n\n   ```sh\n   node x.mjs --write-catalog\n   ```\n\n~~~\nbehavior\n~~~\nEnd\n");
+  assert.equal(prose.includes("color"), false);
+  assert.equal(prose.includes("catalog"), false);
+  assert.equal(prose.includes("behavior"), false);
+  assert.ok(prose.includes("End"));
+  const problems = problemsAfter((root) => edit(root, "CODE_OF_CONDUCT.md", (text) => `${text}\nbehavior\n`));
+  assert.equal(problems.some((problem) => /US spelling/.test(problem)), false, problems.join("\n"));
 });
 
 test("rejects a home directory path", () => {
