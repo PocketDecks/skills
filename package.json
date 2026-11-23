@@ -1,0 +1,22 @@
+{
+  "name": "pocketdecks-skills",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agent skills for changing, reviewing and verifying pull requests on PocketDecks repositories",
+  "keywords": [
+    "cmd-mod",
+    "pocketdecks",
+    "pokemon-tcg-pocket",
+    "pull-requests",
+    "code-review"
+  ],
+  "homepage": "https://github.com/PocketDecks/skills",
+  "repository": "https://github.com/PocketDecks/skills",
+  "license": "AGPL-3.0-or-later",
+  "author": "PocketDecks (https://github.com/PocketDecks)",
+  "commandcode": {
+    "skills": [
+      "./skills"
+    ]
+  }
+}

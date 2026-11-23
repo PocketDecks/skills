@@ -1,0 +1,11 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "groupings": [
+    {
+      "title": "Pokémon TCG Pocket tier list",
+      "skills": [
+        "pokemon-tcg-pocket-tier-list-pr-workflow"
+      ]
+    }
+  ]
+}

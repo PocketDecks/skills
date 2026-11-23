@@ -38,18 +38,18 @@ Running OpenCode inside a clone of this repository loads the skills through [.op
 ### Command Code
 
 ```sh
-command-code skills add PocketDecks/skills
+command-code mods add PocketDecks/skills
 ```
 
-This installs into `.commandcode/skills/` of the current project; add `--global` for `~/.commandcode/skills/`. Pick one skill with `-s <name>`.
+The repository is a Command Code package: [package.json](package.json) ships `skills/` through `commandcode.skills`, so the skills load in every session the package loads in. Add `--global` to install it for every project. To copy one skill instead, run `command-code skills add PocketDecks/skills -s <name>`.
 
 ### Hermes Agent
 
 ```sh
-hermes skills install PocketDecks/skills/skills/pokemon-tcg-pocket-tier-list-pr-workflow
+hermes plugins install PocketDecks/skills
 ```
 
-Preview a skill first with `hermes skills inspect` and the same identifier.
+The repository is an Agent Plugins v1 package: [plugin.json](plugin.json) at the root, with the skills in `skills/`. Portable plugins install disabled; turn it on with `hermes plugins enable pocketdecks-skills`. To install one skill instead, run `hermes skills install PocketDecks/skills/skills/<name>`. [skills.sh.json](skills.sh.json) groups the skills on skills.sh and in the Hermes skills hub.
 
 ### Any other agent
 
@@ -65,6 +65,9 @@ Copy a folder from `skills/` into your agent's skills directory. Each folder hol
 | `.claude-plugin/` | Claude Code plugin and marketplace manifests |
 | `.codex-plugin/`, `.agents/plugins/` | Codex plugin manifest and marketplace |
 | `.opencode/` | OpenCode project config for this repository |
+| `plugin.json` | Agent Plugins v1 manifest for Hermes Agent |
+| `package.json` | Command Code package manifest |
+| `skills.sh.json` | Skill groupings for skills.sh and the Hermes skills hub |
 
 ## Contributing
 

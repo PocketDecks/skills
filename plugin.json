@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pocketdecks-skills",
+  "version": "1.0.0",
+  "description": "Agent skills for changing, reviewing and verifying pull requests on PocketDecks repositories",
+  "author": {
+    "name": "PocketDecks",
+    "url": "https://github.com/PocketDecks"
+  },
+  "homepage": "https://github.com/PocketDecks/skills",
+  "repository": "https://github.com/PocketDecks/skills",
+  "license": "AGPL-3.0-or-later",
+  "keywords": [
+    "pocketdecks",
+    "pokemon-tcg-pocket",
+    "pull-requests",
+    "code-review"
+  ]
+}

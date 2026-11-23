@@ -55,6 +55,9 @@ reviews:
     - path: "evals/**"
       instructions: |
         Trigger evals. Should-trigger queries must read like real requests and cover different phrasings. Should-not-trigger queries must be near-misses that share words with the skill; flag negatives that are trivially unrelated.
+    - path: "{plugin.json,package.json,skills.sh.json}"
+      instructions: |
+        Hermes Agent (plugin.json, Agent Plugins v1) and Command Code (package.json, commandcode.skills) manifests, and skills.sh groupings. Name, version and licence must match .claude-plugin/plugin.json; package.json stays private; every skill in skills/ appears in exactly one grouping.
     - path: ".claude-plugin/**"
       instructions: |
         Claude Code plugin and marketplace manifests. The plugin name and version must match .codex-plugin/plugin.json.
