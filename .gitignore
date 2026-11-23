@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Eval and benchmark output stays local
+evals/**/results/
+evals/**/*-workspace/
