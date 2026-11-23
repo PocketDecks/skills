@@ -32,7 +32,7 @@
 
 ## Bot-opened PRs
 
-- Events created with `GITHUB_TOKEN` start no workflows, so a PR the bot opens gets no CI on its own. `sync-pairings.yml` shows the pattern: after the whole PR block, `gh workflow run ci.yml --ref "$BRANCH"` with `actions: write` in the workflow permissions, retried up to three times inside an `if` condition (which `bash -e` does not abort on), then a named failure message. A dispatch placed before `gh pr create` can fail and leave a pushed branch with no PR. The dispatch starts CI only; such a PR gets no preview deploy
+- A PR opened or updated with `GITHUB_TOKEN` gets its `pull_request` runs, CI and Preview included, in an approval-required state; a user with write access starts them with "Approve workflows to run" in the merge box. `workflow_dispatch` always creates a run, so `sync-pairings.yml` starts CI itself: after the whole PR block, `gh workflow run ci.yml --ref "$BRANCH"`, with `actions: write` in the workflow permissions, retried up to three times inside an `if` condition (which `bash -e` does not abort on), then a named failure message. That dispatch needs no approval but starts CI only, so the preview deploy still waits for the approval. A dispatch placed before `gh pr create` can fail and leave a pushed branch with no PR
 - If PR creation fails with `GitHub Actions is not permitted to create or approve pull requests`, the branch is pushed and the PR is missing. The setting has enterprise, organisation and repository levels; a greyed-out repository checkbox means the organisation policy is off. Check the repository value with `gh api repos/<owner>/<repo>/actions/permissions/workflow`
 
 ## Previews
