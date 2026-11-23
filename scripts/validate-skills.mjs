@@ -266,6 +266,33 @@ const checkManifests = (root, problems) => {
   if (!opencode.skills?.includes(`./${SKILLS_DIR}`)) problems.push(`.opencode/opencode.json: skills must list "./${SKILLS_DIR}"`);
 };
 
+const AGENT_PLUGINS_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+
+// Hermes Agent reads plugin.json (Agent Plugins v1) and skills.sh.json; Command Code reads package.json.
+const checkPackages = (root, names, problems) => {
+  const claude = readJson(root, ".claude-plugin/plugin.json", []);
+  const portable = readJson(root, "plugin.json", problems);
+  const npm = readJson(root, "package.json", problems);
+  const groups = readJson(root, "skills.sh.json", problems);
+  if (!claude || !portable || !npm || !groups) return;
+  if (portable.$schema !== AGENT_PLUGINS_SCHEMA) problems.push(`plugin.json: $schema must be "${AGENT_PLUGINS_SCHEMA}"`);
+  for (const [file, manifest] of [["plugin.json", portable], ["package.json", npm]]) {
+    for (const field of ["name", "version", "license"]) {
+      if (manifest[field] !== claude[field]) problems.push(`${file}: ${field} must match .claude-plugin/plugin.json`);
+    }
+  }
+  if (npm.private !== true) problems.push("package.json: private must be true");
+  if (!npm.keywords?.includes("cmd-mod")) problems.push('package.json: keywords must include "cmd-mod"');
+  if (!npm.commandcode?.skills?.includes(`./${SKILLS_DIR}`)) problems.push(`package.json: commandcode.skills must list "./${SKILLS_DIR}"`);
+  const grouped = (Array.isArray(groups.groupings) ? groups.groupings : []).flatMap((group) => group?.skills ?? []);
+  for (const name of names) {
+    if (!grouped.includes(name)) problems.push(`skills.sh.json: no grouping lists "${name}"`);
+  }
+  for (const name of grouped) {
+    if (!names.includes(name)) problems.push(`skills.sh.json: "${name}" is not a skill in ${SKILLS_DIR}/`);
+  }
+};
+
 const checkCatalog = (root, problems) => {
   const expected = JSON.stringify(buildCatalog(root), null, 2);
   const file = path.join(root, CATALOG);
@@ -314,6 +341,7 @@ export const validate = (root) => {
   checkLinks(root, entries, problems);
   checkTree(root, entries, problems);
   checkManifests(root, problems);
+  checkPackages(root, names, problems);
   checkCatalog(root, problems);
   checkEvals(root, names, problems);
   return problems;

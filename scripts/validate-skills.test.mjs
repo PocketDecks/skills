@@ -251,6 +251,33 @@ test("rejects trigger evals that are a JSON scalar", () => {
   expectProblem(problemsAfter((root) => fs.writeFileSync(path.join(root, relative), "0\n")), /trigger-evals.json: must be a JSON array/);
 });
 
+test("rejects Hermes and Command Code manifests that drift from the Claude plugin", () => {
+  for (const [file, field] of [["plugin.json", "name"], ["plugin.json", "version"], ["plugin.json", "license"], ["package.json", "name"], ["package.json", "version"], ["package.json", "license"]]) {
+    expectProblem(problemsAfter((root) => editJson(root, file, (json) => ({ ...json, [field]: "other" }))), new RegExp(`^${file}: ${field} must match`));
+  }
+});
+
+test("rejects a plugin.json without the Agent Plugins schema", () => {
+  expectProblem(problemsAfter((root) => editJson(root, "plugin.json", ({ $schema, ...json }) => json)), /plugin.json: \$schema must be/);
+});
+
+test("rejects a package.json that is public, untagged or lists no skills", () => {
+  expectProblem(problemsAfter((root) => editJson(root, "package.json", (json) => ({ ...json, private: false }))), /package.json: private must be true/);
+  expectProblem(problemsAfter((root) => editJson(root, "package.json", (json) => ({ ...json, keywords: ["pocketdecks"] }))), /keywords must include "cmd-mod"/);
+  expectProblem(problemsAfter((root) => editJson(root, "package.json", (json) => ({ ...json, commandcode: { skills: [] } }))), /commandcode.skills must list "\.\/skills"/);
+});
+
+test("rejects skills.sh.json groupings that miss a skill or name an unknown one", () => {
+  expectProblem(problemsAfter((root) => editJson(root, "skills.sh.json", (json) => ({ ...json, groupings: [{ title: "x", skills: ["ghost-skill"] }] }))), new RegExp(`no grouping lists "${skill}"`));
+  expectProblem(problemsAfter((root) => editJson(root, "skills.sh.json", (json) => ({ ...json, groupings: [{ title: "x", skills: [skill, "ghost-skill"] }] }))), /"ghost-skill" is not a skill/);
+});
+
+test("rejects a missing Hermes or Command Code manifest", () => {
+  for (const file of ["plugin.json", "package.json", "skills.sh.json"]) {
+    expectProblem(problemsAfter((root) => fs.rmSync(path.join(root, file))), new RegExp(`^${file.replace(".", "\\.")}: missing`));
+  }
+});
+
 test("rejects a repository with no skills", () => {
   expectProblem(problemsAfter((root) => fs.rmSync(path.join(root, "skills", skill), { recursive: true }), { catalog: false }), /skills: no skills found/);
 });
