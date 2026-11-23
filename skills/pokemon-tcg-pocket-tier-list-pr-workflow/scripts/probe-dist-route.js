@@ -8,6 +8,9 @@
 // Usage, from the repository root after `yarn build`:
 //   node <skill-dir>/scripts/probe-dist-route.js dist /statistics/ "No deck movement"
 //
+// Requiring this file defines helpers only. The server and browser start from
+// the CLI.
+//
 // What it does, and nothing else:
 // - Serves the build directory on 127.0.0.1 only (PROBE_PORT, default 4321).
 //   A path resolves to its file, then to <dir>/index.html, then falls back to
@@ -30,8 +33,6 @@ const http = require("http");
 const path = require("path");
 const { createRequire } = require("module");
 
-const puppeteer = createRequire(path.join(process.cwd(), "package.json"))("puppeteer");
-
 const MIME = {
   ".html": "text/html",
   ".js": "text/javascript",
@@ -46,62 +47,62 @@ const MIME = {
   ".woff2": "font/woff2",
 };
 
-const [distArg, route = "/", ...needles] = process.argv.slice(2);
-if (!distArg) {
-  console.error("usage: node probe-dist-route.js <dist-dir> <route> [text ...]");
-  process.exit(2);
-}
+const isFile = (item) => fs.existsSync(item) && fs.statSync(item).isFile();
 
-const DIST = path.resolve(distArg);
-const PORT = Number(process.env.PROBE_PORT || 4321);
-const SETTLE_MS = Number(process.env.PROBE_SETTLE_MS || 1500);
-const ORIGIN = `http://127.0.0.1:${PORT}`;
-
-const isFile = (p) => fs.existsSync(p) && fs.statSync(p).isFile();
-
-const resolveFile = (urlPath) => {
-  const target = path.resolve(DIST, `.${urlPath}`);
-  if (target !== DIST && !target.startsWith(DIST + path.sep)) return null;
+const resolveFile = (dist, urlPath) => {
+  const root = path.resolve(dist);
+  const target = path.resolve(root, `.${urlPath}`);
+  if (target !== root && !target.startsWith(root + path.sep)) return null;
   for (const candidate of [target, path.join(target, "index.html")]) {
     if (isFile(candidate)) return candidate;
   }
-  return path.join(DIST, "index.html");
+  return path.join(root, "index.html");
 };
 
-const server = http.createServer((req, res) => {
-  let file;
-  try {
-    file = resolveFile(decodeURIComponent(new URL(req.url, ORIGIN).pathname));
-  } catch {
-    file = null;
-  }
-  if (!file) {
-    res.writeHead(404).end();
-    return;
-  }
-  res.writeHead(200, {
-    "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream",
-  });
-  fs.createReadStream(file).pipe(res);
-});
+const isLoopbackRequest = (url, origin) => url.startsWith(`${origin}/`);
 
-const run = async () => {
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(PORT, "127.0.0.1", resolve);
+const createServer = (dist, origin) =>
+  http.createServer((req, res) => {
+    let file;
+    try {
+      file = resolveFile(dist, decodeURIComponent(new URL(req.url, origin).pathname));
+    } catch {
+      file = null;
+    }
+    if (!file) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream",
+    });
+    fs.createReadStream(file).pipe(res);
   });
-  const browser = await puppeteer.launch({ headless: true });
+
+const run = async (distArg, route, needles) => {
+  const dist = path.resolve(distArg);
+  const port = Number(process.env.PROBE_PORT || 4321);
+  const settleMs = Number(process.env.PROBE_SETTLE_MS || 1500);
+  const origin = `http://127.0.0.1:${port}`;
+  const puppeteer = createRequire(path.join(process.cwd(), "package.json"))("puppeteer");
+  const server = createServer(dist, origin);
+  let browser;
   try {
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(port, "127.0.0.1", resolve);
+    });
+    browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.setRequestInterception(true);
     page.on("request", (request) =>
-      request.url().startsWith(`${ORIGIN}/`) ? request.continue() : request.abort()
+      isLoopbackRequest(request.url(), origin) ? request.continue() : request.abort()
     );
     await page.setViewport({ width: 1280, height: 2000 });
-    await page.goto(`${ORIGIN}${route}`, { waitUntil: "networkidle2" });
-    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await page.goto(`${origin}${route}`, { waitUntil: "networkidle2" });
+    await new Promise((resolve) => setTimeout(resolve, settleMs));
 
     const result = await page.evaluate((texts) => {
       const body = document.body.innerText;
@@ -118,13 +119,21 @@ const run = async () => {
 
     console.log(JSON.stringify({ route, ...result, pageErrors }, null, 2));
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
     server.close();
   }
 };
 
-run().catch((error) => {
-  console.error("probe failed:", error.message);
-  server.close();
-  process.exit(1);
-});
+if (require.main === module) {
+  const [distArg, route = "/", ...needles] = process.argv.slice(2);
+  if (!distArg) {
+    console.error("usage: node probe-dist-route.js <dist-dir> <route> [text ...]");
+    process.exit(2);
+  }
+  run(distArg, route, needles).catch((error) => {
+    console.error("probe failed:", error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { resolveFile, isLoopbackRequest };
