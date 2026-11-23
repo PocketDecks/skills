@@ -42,6 +42,17 @@ const walk = (root, relative = "") => {
   return entries;
 };
 
+// Plain values YAML reads as null, booleans, numbers or flow collections keep that type,
+// so a field such as `description: null` is not mistaken for text.
+const yamlScalar = (value) => {
+  if (/^(?:~|null)?$/i.test(value)) return null;
+  if (/^(?:true|false)$/i.test(value)) return value.toLowerCase() === "true";
+  if (/^[-+]?(?:\d[\d_]*(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(value)) return Number(value.replaceAll("_", ""));
+  if (/^\[.*\]$/.test(value)) return value.slice(1, -1).split(",").map((item) => item.trim()).filter(Boolean);
+  if (/^\{.*\}$/.test(value)) return {};
+  return value.replace(/^(["'])(.*)\1$/, "$2");
+};
+
 export const parseFrontmatter = (text) => {
   const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
   if (!match) return null;
@@ -51,12 +62,15 @@ export const parseFrontmatter = (text) => {
   let folded = false;
   const closeBlock = () => {
     if (blockKey === null) return;
-    fields[blockKey] = folded ? blockLines.join(" ").trim() : blockLines.join("\n").trim();
+    const text = blockLines.join("\n").trim();
+    fields[blockKey] = folded
+      ? text.replace(/\n+/g, (breaks) => (breaks.length === 1 ? " " : "\n".repeat(breaks.length - 1)))
+      : text;
     blockKey = null;
     blockLines = [];
   };
   for (const line of match[1].split("\n")) {
-    if (blockKey !== null && /^\s+\S/.test(line)) {
+    if (blockKey !== null && (/^\s+\S/.test(line) || /^\s*$/.test(line))) {
       blockLines.push(line.trim());
       continue;
     }
@@ -64,11 +78,11 @@ export const parseFrontmatter = (text) => {
     const pair = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
     if (!pair) continue;
     const [, key, value] = pair;
-    if (/^[>|][-+]?$/.test(value)) {
+    if (/^[>|](?:[1-9]?[-+]?|[-+][1-9])$/.test(value)) {
       blockKey = key;
       folded = value.startsWith(">");
     } else {
-      fields[key] = value.replace(/^(["'])(.*)\1$/, "$2");
+      fields[key] = yamlScalar(value);
     }
   }
   closeBlock();
@@ -104,13 +118,21 @@ export const buildCatalog = (root) => ({
   }),
 });
 
-const readJson = (root, relative, problems) => {
+const readJson = (root, relative, problems, shape = "object") => {
+  let value;
   try {
-    return JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
+    value = JSON.parse(fs.readFileSync(path.join(root, relative), "utf8"));
   } catch (error) {
     problems.push(`${relative}: ${error.code === "ENOENT" ? "missing" : `invalid JSON (${error.message})`}`);
     return null;
   }
+  const isArray = Array.isArray(value);
+  const fits = shape === "array" ? isArray : value !== null && typeof value === "object" && !isArray;
+  if (!fits) {
+    problems.push(`${relative}: must be a JSON ${shape}`);
+    return null;
+  }
+  return value;
 };
 
 const checkSkill = (root, name, problems) => {
@@ -131,12 +153,16 @@ const checkSkill = (root, name, problems) => {
   for (const key of Object.keys(fields)) {
     if (!ALLOWED_FRONTMATTER.has(key)) problems.push(`${where}: unexpected frontmatter key "${key}"`);
   }
-  if (fields.name !== name) problems.push(`${where}: name "${fields.name ?? ""}" must equal the folder name "${name}"`);
-  const description = fields.description ?? "";
+  for (const key of ["name", "description", "license", "compatibility"]) {
+    if (key in fields && typeof fields[key] !== "string") problems.push(`${where}: ${key} must be a string`);
+  }
+  const text = (key) => (typeof fields[key] === "string" ? fields[key] : "");
+  if (fields.name !== name) problems.push(`${where}: name "${text("name")}" must equal the folder name "${name}"`);
+  const description = text("description");
   if (!description) problems.push(`${where}: description is missing`);
   if (description.length > 1024) problems.push(`${where}: description is ${description.length} characters, over 1024`);
   if (/[<>]/.test(description)) problems.push(`${where}: description contains an angle bracket`);
-  if ((fields.compatibility ?? "").length > 500) problems.push(`${where}: compatibility is over 500 characters`);
+  if (text("compatibility").length > 500) problems.push(`${where}: compatibility is over 500 characters`);
   if (fields.license !== "AGPL-3.0-or-later") problems.push(`${where}: license must be AGPL-3.0-or-later`);
   if (!fs.existsSync(path.join(root, SKILLS_DIR, name, "LICENSE"))) problems.push(`${SKILLS_DIR}/${name}/LICENSE: missing`);
 };
@@ -218,12 +244,8 @@ const checkEvals = (root, names, problems) => {
   }
   for (const name of names) {
     const relative = `${EVALS_DIR}/${name}/trigger-evals.json`;
-    const items = readJson(root, relative, problems);
+    const items = readJson(root, relative, problems, "array");
     if (!items) continue;
-    if (!Array.isArray(items)) {
-      problems.push(`${relative}: must be an array`);
-      continue;
-    }
     const seen = new Set();
     let positive = 0;
     let negative = 0;

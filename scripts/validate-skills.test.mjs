@@ -67,6 +67,30 @@ test("rejects a description over 1024 characters", () => {
   expectProblem(problemsAfter((root) => edit(root, skillMd, (text) => text.replace("description: >-\n", `description: >-\n  ${"x".repeat(1025)}\n`))), /over 1024/);
 });
 
+test("keeps blank lines inside a block description", () => {
+  const fields = parseFrontmatter("---\nname: demo\ndescription: >-\n  first\n\n  second\n  third\nlicense: MIT\n---\n");
+  assert.deepEqual(fields, { name: "demo", description: "first\nsecond third", license: "MIT" });
+  const literal = parseFrontmatter("---\ndescription: |\n  first\n\n  second\n---\n");
+  assert.equal(literal.description, "first\n\nsecond");
+  for (const indicator of [">2-", ">-2"]) {
+    assert.equal(parseFrontmatter(`---\ndescription: ${indicator}\n  a\n  b\n---\n`).description, "a b");
+  }
+});
+
+test("rejects a description that runs over 1024 characters after a blank line", () => {
+  expectProblem(problemsAfter((root) => edit(root, skillMd, (text) => text.replace("description: >-\n", `description: >-\n  short\n\n  ${"x".repeat(1025)}\n`))), /over 1024/);
+});
+
+test("rejects a description that YAML reads as null or a list", () => {
+  for (const value of ["null", "~", "[]", "[a, b]", "{a: b}", "true", "42"]) {
+    expectProblem(problemsAfter((root) => edit(root, skillMd, (text) => text.replace(/description: >-\n(?:  .*\n)+/, `description: ${value}\n`))), /description must be a string/);
+  }
+});
+
+test("reads quoted YAML keywords as text", () => {
+  assert.deepEqual(parseFrontmatter("---\nname: 'null'\ndescription: \"42\"\n---\n"), { name: "null", description: "42" });
+});
+
 test("rejects an angle bracket in the description", () => {
   expectProblem(problemsAfter((root) => edit(root, skillMd, (text) => text.replace("description: >-\n", "description: >-\n  use <this>\n"))), /angle bracket/);
 });
@@ -193,7 +217,16 @@ test("rejects a malformed trigger eval item", () => {
 
 test("rejects trigger evals that are not an array", () => {
   const relative = path.join("evals", skill, "trigger-evals.json");
-  expectProblem(problemsAfter((root) => editJson(root, relative, () => ({ items: [] }))), /must be an array/);
+  expectProblem(problemsAfter((root) => editJson(root, relative, () => ({ items: [] }))), /must be a JSON array/);
+});
+
+test("rejects a manifest that is a JSON scalar", () => {
+  expectProblem(problemsAfter((root) => fs.writeFileSync(path.join(root, ".claude-plugin", "plugin.json"), "null\n")), /plugin.json: must be a JSON object/);
+});
+
+test("rejects trigger evals that are a JSON scalar", () => {
+  const relative = path.join("evals", skill, "trigger-evals.json");
+  expectProblem(problemsAfter((root) => fs.writeFileSync(path.join(root, relative), "0\n")), /trigger-evals.json: must be a JSON array/);
 });
 
 test("rejects a repository with no skills", () => {
