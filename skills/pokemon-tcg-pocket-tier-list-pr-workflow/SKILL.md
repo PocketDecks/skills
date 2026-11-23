@@ -55,7 +55,7 @@ Capture each gate's exit code with its output in a file (`log=$(mktemp); yarn te
 
 ## Verification rules
 
-- A test counts only after it has failed. For every new or changed test, reintroduce the bug as a one-line mutant in production code, run the focused file, confirm the named test fails, restore, and report the mutant and the failing test. Stage or copy the fix first, because `git checkout -- <file>` restores from the index and destroys an unstaged fix. Procedure and pitfalls are in [test-integrity.md](references/test-integrity.md)
+- A test counts only after it has failed. For every new or changed test, reintroduce the bug as a one-line mutant in production code, run the focused file, confirm the named test fails, restore, and report the mutant and the failing test. Run the proof with `node <skill-dir>/scripts/mutate.mjs`. Stage or copy the fix first, because `git checkout -- <file>` restores from the index and destroys an unstaged fix. Procedure and pitfalls are in [test-integrity.md](references/test-integrity.md)
 - Take fixtures from the real producer: messages from the code that prints them, rows from `public/data/`, card ids from the card package. An invented fixture tests the code against input no real run produces
 - An expectation computed with the helper the code itself calls only proves the two agree. Pair it with a check against an independent source, usually the built output
 - Prove a no-behaviour-change refactor by diffing what it produces (the built HTML, the generated JSON) before and after and requiring zero differences. A green suite cannot show that moved code emits the same bytes
