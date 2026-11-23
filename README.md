@@ -35,6 +35,22 @@ Add the skills catalogue to your `opencode.json` (global or per project):
 
 Running OpenCode inside a clone of this repository loads the skills through [.opencode/opencode.json](.opencode/opencode.json).
 
+### Command Code
+
+```sh
+command-code skills add PocketDecks/skills
+```
+
+This installs into `.commandcode/skills/` of the current project; add `--global` for `~/.commandcode/skills/`. Pick one skill with `-s <name>`.
+
+### Hermes Agent
+
+```sh
+hermes skills install PocketDecks/skills/skills/pokemon-tcg-pocket-tier-list-pr-workflow
+```
+
+Preview a skill first with `hermes skills inspect` and the same identifier.
+
 ### Any other agent
 
 Copy a folder from `skills/` into your agent's skills directory. Each folder holds a `SKILL.md` with its trigger description and instructions, a `references/` folder it loads on demand, and any helper scripts.
