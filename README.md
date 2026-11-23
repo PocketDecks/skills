@@ -25,7 +25,7 @@ Then run `codex`, open `/plugins` and install `pocketdecks-skills`. Start a new 
 
 ### OpenCode
 
-Add the skills catalog to your `opencode.json` (global or per project):
+Add the skills catalogue to your `opencode.json` (global or per project):
 
 ```json
 {
@@ -43,9 +43,9 @@ Copy a folder from `skills/` into your agent's skills directory. Each folder hol
 
 | Path | Purpose |
 | --- | --- |
-| `skills/` | One folder per skill, plus `index.json`, the OpenCode catalog |
+| `skills/` | One folder per skill, plus `index.json`, the OpenCode catalogue |
 | `evals/` | Trigger evals for each skill, see [evals/README.md](evals/README.md) |
-| `scripts/validate-skills.mjs` | Checks frontmatter, links, manifests, the catalog, the evals and the published text |
+| `scripts/validate-skills.mjs` | Checks frontmatter, links, manifests, the catalogue, the evals and the published text |
 | `.claude-plugin/` | Claude Code plugin and marketplace manifests |
 | `.codex-plugin/`, `.agents/plugins/` | Codex plugin manifest and marketplace |
 | `.opencode/` | OpenCode project config for this repository |

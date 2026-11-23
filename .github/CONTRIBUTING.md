@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. This repository publishes agent skills, so every change is read by people and by models. Keep it accurate, short and checkable.
+This repository publishes agent skills. People and models both read every change, so keep it accurate and checkable.
 
 ## Before you open a pull request
 
@@ -12,7 +12,7 @@ Thanks for helping. This repository publishes agent skills, so every change is r
    node --test "scripts/*.test.mjs"
    ```
 
-3. If you changed any file inside a skill folder, regenerate the OpenCode catalog and commit it with the change:
+3. If you changed any file inside a skill folder, regenerate the OpenCode catalogue and commit it with the change:
 
    ```sh
    node scripts/validate-skills.mjs --write-catalog
