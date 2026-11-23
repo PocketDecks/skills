@@ -30,7 +30,7 @@ Failures that read like product defects but come from the test set-up. The front
 - `isAffordable` in `src/app/deck-filters.ts` caps each card at `2 - missingCount` copies. Cutting one copy of a two-copy card leaves that list affordable, so a test that must evict a list cuts both copies. Work the arithmetic per test rather than trusting a comment
 - Locate card tiles by image URL scoped to button tiles (`within(tile).queryAllByRole("img")`). Alt text repeats across printings, and image URLs carry `set/number` (`cards/b3/079.webp`), never the dash id, so `src.includes(cardId)` matches nothing and can pass a whole sweep
 - The cut invariant is the tile's copy count strictly decreasing, not the tile vanishing, because a card that a surviving list carries once stays visible after one cut
-- The tier-list build (`src/app/build-decks.ts`) trims everything after the last `&`-named deck when `applyPairedTrim` is set; detail pages never trim. Keep that option explicit rather than inferring it from another filter
+- The tier-list build (`src/app/build-decks.ts`) trims everything after the last `&`-named deck when `applyPairedTrim` is set. `src/contexts/DecksContext.tsx` sets it only while no energy filter is active (`applyPairedTrim: energy === null`), and detail pages never trim. Pass the option at each call site rather than having `buildDecks` infer it
 
 ## Fixtures and counts that move with data
 
