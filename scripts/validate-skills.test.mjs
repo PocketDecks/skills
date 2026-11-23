@@ -132,6 +132,8 @@ test("allows US spellings in code, link targets and verbatim texts", () => {
   const fenceLike = proseOf("~~~\n~~~example\nbehavior\n```\ncolor\n~~\n~~~ \nafter\n");
   assert.equal(fenceLike, "after\n");
   assert.equal(proseOf("~~~~\n~~~\ncolor\n~~~~\nafter\n"), "after\n");
+  assert.equal(proseOf("```example```\n\nUse color.\n"), "\n\nUse color.\n");
+  assert.equal(proseOf("```js\ncolor\n```\n~~~ `quoted` info\ngray\n~~~\nafter\n"), "after\n");
   assert.equal(proseOf('[a](https://example.com/catalog "Guide catalog") [b](x \'colour\') [c](y (gray))\n'), "[a] [b] [c]\n");
   const problems = problemsAfter((root) => edit(root, "CODE_OF_CONDUCT.md", (text) => `${text}\nbehavior\n`));
   assert.equal(problems.some((problem) => /US spelling/.test(problem)), false, problems.join("\n"));

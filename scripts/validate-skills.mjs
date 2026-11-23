@@ -49,8 +49,8 @@ const withoutFences = (markdown) => {
   let fence = null;
   for (const line of markdown.split("\n")) {
     if (fence === null) {
-      const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
-      if (open) fence = open[1];
+      const open = /^[ \t]*(?:(`{3,})[^`]*|(~{3,}).*)$/.exec(line);
+      if (open) fence = open[1] ?? open[2];
       else kept.push(line);
     } else if (new RegExp(`^[ \\t]*${fence[0]}{${fence.length},}[ \\t]*$`).test(line)) {
       fence = null;
