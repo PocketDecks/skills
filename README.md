@@ -8,57 +8,13 @@ Agent skills for working on [PocketDecks](https://github.com/PocketDecks) reposi
 
 ## Install
 
-### Claude Code
-
-```text
-/plugin marketplace add PocketDecks/skills
-/plugin install pocketdecks-skills@pocketdecks
-```
-
-### Codex
-
-```sh
-codex plugin marketplace add PocketDecks/skills
-```
-
-Then run `codex`, open `/plugins` and install `pocketdecks-skills`. Start a new session before using it.
-
-### OpenCode
-
-Add the skills catalogue to your `opencode.json` (global or per project):
-
-```json
-{
-  "skills": ["https://raw.githubusercontent.com/PocketDecks/skills/main/skills/"]
-}
-```
-
-Running OpenCode inside a clone of this repository loads the skills through [.opencode/opencode.json](.opencode/opencode.json).
-
-### Command Code
-
-```sh
-command-code mods add PocketDecks/skills
-```
-
-The repository is a Command Code package: [package.json](package.json) ships `skills/` through `commandcode.skills`, so the skills load in every session the package loads in. Add `--global` to install it for every project. To copy one skill instead, run `command-code skills add PocketDecks/skills -s <name>`.
-
-### Hermes Agent
-
-```sh
-hermes plugins install PocketDecks/skills
-```
-
-The repository is an Agent Plugins v1 package: [plugin.json](plugin.json) at the root, with the skills in `skills/`. Portable plugins install disabled; turn it on with `hermes plugins enable pocketdecks-skills`. To install one skill instead, run `hermes skills install PocketDecks/skills/skills/<name>`. [skills.sh.json](skills.sh.json) groups the skills on skills.sh and in the Hermes skills hub.
-
-### Any other agent
-
-Copy a folder from `skills/` into your agent's skills directory. Each folder holds a `SKILL.md` with its trigger description and instructions, a `references/` folder it loads on demand, and any helper scripts.
+See [install.md](install.md) for Claude Code, Codex, OpenCode, Command Code, Hermes Agent and manual installation.
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
+| `install.md` | Install commands for each supported agent |
 | `skills/` | One folder per skill, plus `index.json`, the OpenCode catalogue |
 | `evals/` | Trigger evals for each skill, see [evals/README.md](evals/README.md) |
 | `scripts/validate-skills.mjs` | Checks frontmatter, links, manifests, the catalogue, the evals and the published text |

@@ -1,0 +1,32 @@
+{
+  "skill": "pokemon-tcg-pocket-tier-list-pr-workflow",
+  "workingCopy": "the Hermes profile copy of this skill",
+  "published": [
+    "SKILL.md",
+    "LICENSE",
+    "references/card-data.md",
+    "references/ci-and-deploys.md",
+    "references/deck-naming.md",
+    "references/delegation-and-handoffs.md",
+    "references/frontend.md",
+    "references/gates-and-environment.md",
+    "references/git-and-editing.md",
+    "references/locales-and-prerender.md",
+    "references/pipeline.md",
+    "references/scoring-and-windows.md",
+    "references/test-integrity.md",
+    "references/testing-quirks.md",
+    "scripts/probe-dist-route.js"
+  ],
+  "frontmatter": {
+    "license": "AGPL-3.0-or-later",
+    "dropKeys": ["version", "author", "metadata"]
+  },
+  "promotion": [
+    "Copy only the published files from the working copy",
+    "Apply the frontmatter rules and leave Hermes-only keys out of the repository",
+    "Run the validator and its tests from the repository root",
+    "Record the trigger rates in the pull request when the description changed",
+    "Treat working-copy files outside the published list as drift, not as content to mirror"
+  ]
+}
