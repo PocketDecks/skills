@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "pocketdecks",
+  "description": "Agent skills for working on PocketDecks repositories",
+  "owner": {
+    "name": "PocketDecks",
+    "url": "https://github.com/PocketDecks"
+  },
+  "plugins": [
+    {
+      "name": "pocketdecks-skills",
+      "description": "Agent skills for changing, reviewing and verifying pull requests on PocketDecks repositories",
+      "source": "./",
+      "category": "development"
+    }
+  ]
+}
