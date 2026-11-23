@@ -22,10 +22,6 @@ This is the working guide for changing, reviewing and verifying pull requests on
 
 One rule runs through every section. Nothing counts as fixed, green or verified until a command run at the current head shows it, and the report says which commands ran
 
-## When to use and when not to
-
-Use it for any change, review, QA pass or CI investigation on that repository, including its generated data and its workflows. Skip it for other Pokémon TCG repositories, the physical TCG, questions about decks that need no repository change, and GitHub help with no tie to this project
-
 ## Ground rules
 
 - Do not commit, push, open or edit a PR, merge or deploy unless asked. A merge also needs the maintainer's direct approval. Never push to `main`; a repository ruleset blocks direct pushes, so every change reaches it through a squash-merged PR
@@ -41,7 +37,7 @@ Use it for any change, review, QA pass or CI investigation on that repository, i
 2. Record `git branch --show-current`, `git rev-parse HEAD` and `git status --short`. Check branch and HEAD again before the first edit after any checkout, branch switch or PR detour, because a leftover branch or a detached HEAD silently takes the edits
 3. For PR work, read live metadata first: `gh pr view <n> --repo PocketDecks/pokemon-tcg-pocket-tier-list --json headRefOid,baseRefOid,headRefName,headRepositoryOwner,state,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup`. Reconcile every earlier finding, brief and handoff against that head, since later commits can resolve or move them
 4. If the checkout is dirty or carries unrelated commits, work in a fresh worktree (`git worktree add <path> -b <branch> origin/main`). Never check out a PR over someone's uncommitted changes, and stage only paths you own
-5. Use the Node version in `.nvmrc` and Yarn 1. Install from the lockfiles in each root you touch: `yarn install --frozen-lockfile` at the root and in `analysis/`. Never symlink another checkout's `node_modules`; its versions can disagree with this branch's lockfile and fail tests the change never touched
+5. Use the Node version in `.nvmrc` and Yarn 1. Install from the lockfiles in each root you touch: `yarn install --frozen-lockfile` at the root and in `analysis/`. Never symlink or share another checkout's `node_modules`; its versions can disagree with this branch's lockfile and fail tests the change never touched, and an install through the link prunes the other tree
 6. Run the relevant gates once on the untouched base and record the failure count and names. Compare every later result with that baseline
 
 ## Gates

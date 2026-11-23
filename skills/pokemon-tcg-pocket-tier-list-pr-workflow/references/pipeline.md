@@ -12,7 +12,6 @@
 - When asked what a PR touched, separate references from data. `git fetch`, `gh api` reads and a frozen install fetch no data; a download, a pairing sync or a pipeline run does. Say which ran
 - After a rebuild, prove the generated data reaches its consumer: `yarn build` must prerender and pass `verify-dist-html`, and a browser-rendered `/tier-list` must show `/deck/` links. Deck counts and image parity alone do not show the ranking survived
 - When only one published file should change, diff every other file in `public/data/` against `git show HEAD:<path>` and require them byte-identical, then diff the changed file field by field and check row order
-- In a merge conflict on generated data, keep `main`'s version unless the change is meant to move that file. A rebuild touches unrelated rankings, images and timestamps
 - Stage OG image changes with `git add -A public/og/deck`, so renamed decks land their deletions and additions in the same commit
 
 ## Writing files and recovering

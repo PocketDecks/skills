@@ -50,4 +50,3 @@
 
 - After `yarn build`, any static server pointed at `dist/` shows the prerendered HTML. `curl` and `grep` see only that prerendered shell
 - For the hydrated DOM (a table filled after a fetch, a link count, an absent notice), run this skill's probe from the repository root: `node <skill-dir>/scripts/probe-dist-route.js dist /statistics/ "No deck movement"`. It serves `dist/` on loopback only, aborts every outside request, and prints the title, deck-link count, which texts appear, page errors and the first body lines. The header of the script documents its environment variables
-- Firebase preview channels reuse one URL per PR across pushes. Hard-reload before diagnosing a blank screen or a stuck loading state, since an open tab requests old hashed chunks that no longer exist
