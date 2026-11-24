@@ -61,7 +61,7 @@ const main = () => {
     if (countOccurrences(original, args.find) !== 1) {
       throw new Error(`--find must occur exactly once in ${args.file}`);
     }
-    const mutated = Buffer.from(original.replace(args.find, args.replace));
+    const mutated = Buffer.from(original.replace(args.find, () => args.replace));
     fs.writeFileSync(args.file, mutated);
     if (!sameBytes(fs.readFileSync(args.file), mutated)) {
       throw new Error(`mutant did not land in ${args.file}`);

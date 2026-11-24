@@ -105,3 +105,12 @@ test("detects a byte mismatch", () => {
   assert.equal(sameBytes(Buffer.from("abc"), Buffer.from("abc")), true);
   assert.equal(sameBytes(Buffer.from("abc"), Buffer.from("abd")), false);
 });
+
+test("lands a replacement with dollar patterns verbatim", (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const side = path.join(dir, "side.mjs");
+  const copy = path.join(dir, "copy.cjs");
+  fs.writeFileSync(copy, `require("node:fs").copyFileSync(${JSON.stringify(target)}, ${JSON.stringify(side)});\n`);
+  invoke({ find: "= 2", replace: "= $&9", test: `node "${copy}"`, expect: "no test name" });
+  assert.match(fs.readFileSync(side, "utf8"), /limit = \$&9;/);
+});
