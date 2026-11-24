@@ -32,7 +32,7 @@ const fixture = (t) => {
   return { dir, read, run };
 };
 
-test("moves all four manifests together", (t) => {
+test("moves all four manifests together", { timeout: 30_000 }, (t) => {
   const { dir, run } = fixture(t);
   const result = run("1.2.3");
   assert.equal(result.status, 0, result.stderr);
@@ -46,7 +46,7 @@ test("moves all four manifests together", (t) => {
   assert.equal(validator.status, 0, validator.stdout + validator.stderr);
 });
 
-test("rejects a two-part version", (t) => {
+test("rejects a two-part version", { timeout: 30_000 }, (t) => {
   const { read, run } = fixture(t);
   const before = read();
   const result = run("1.2");
@@ -54,7 +54,7 @@ test("rejects a two-part version", (t) => {
   assert.deepEqual(read(), before);
 });
 
-test("leaves every file untouched when a later manifest is malformed", (t) => {
+test("leaves every file untouched when a later manifest is malformed", { timeout: 30_000 }, (t) => {
   const { dir, read, run } = fixture(t);
   const file = path.join(dir, ".codex-plugin", "plugin.json");
   const text = fs.readFileSync(file, "utf8");
@@ -68,7 +68,7 @@ test("leaves every file untouched when a later manifest is malformed", (t) => {
   assert.deepEqual(read(), before);
 });
 
-test("rejects a truncated manifest without writing any file", (t) => {
+test("rejects a truncated manifest without writing any file", { timeout: 30_000 }, (t) => {
   const { dir, read, run } = fixture(t);
   const file = path.join(dir, "package.json");
   const text = fs.readFileSync(file, "utf8");
@@ -80,7 +80,7 @@ test("rejects a truncated manifest without writing any file", (t) => {
   assert.deepEqual(read(), before);
 });
 
-test("builds the malformed fixture after a release", (t) => {
+test("builds the malformed fixture after a release", { timeout: 30_000 }, (t) => {
   const { dir, read, run } = fixture(t);
   const first = run("1.2.3");
   assert.equal(first.status, 0, first.stderr);
@@ -93,5 +93,20 @@ test("builds the malformed fixture after a release", (t) => {
   const before = read();
   const result = run("2.0.0");
   assert.notEqual(result.status, 0);
+  assert.deepEqual(read(), before);
+});
+
+
+test("rejects a nested version field in package.json", { timeout: 30_000 }, (t) => {
+  const { dir, read, run } = fixture(t);
+  const file = path.join(dir, "package.json");
+  const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  parsed.version = "0.9.0";
+  parsed.engines = { version: "1.0.0" };
+  fs.writeFileSync(file, `${JSON.stringify(parsed, null, 2)}\n`);
+  const before = read();
+  const result = run("1.0.1");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /package\.json: version is 0\.9\.0, expected 1\.0\.0/);
   assert.deepEqual(read(), before);
 });
