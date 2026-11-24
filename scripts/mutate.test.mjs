@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync, spawn } from "node:child_process";
-import { sameBytes } from "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs";
+import { namesFailedTest, sameBytes } from "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const script = path.resolve(here, "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs");
@@ -271,4 +271,16 @@ test("removes its signal listeners", (t) => {
   assert.equal(result.status, 1);
   const counts = JSON.parse(result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
   assert.equal(counts.after, counts.before);
+});
+
+test("matches a Vitest cross marker for the failed test", () => {
+  assert.equal(namesFailedTest("     × keeps the limit at two 3ms", "keeps the limit at two"), true);
+});
+
+test("matches a Vitest FAIL line for the failed test", () => {
+  assert.equal(namesFailedTest(" FAIL  check.test.ts > limits > keeps the limit at two", "keeps the limit at two"), true);
+});
+
+test("does not match a Vitest summary line", () => {
+  assert.equal(namesFailedTest(" ❯ check.test.ts (2 tests | 1 failed) 3ms", "check.test.ts"), false);
 });

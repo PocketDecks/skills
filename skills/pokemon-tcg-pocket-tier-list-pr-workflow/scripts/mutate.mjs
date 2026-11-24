@@ -3,7 +3,8 @@
 //
 // Applies one exact mutation to a file, runs a focused test command and reports
 // whether that command failed the named test. The file is restored byte for
-// byte before the report is printed.
+// byte before the report is printed. It recognises node:test, TAP and Vitest
+// failure lines.
 //
 // Usage:
 //   node <skill-dir>/scripts/mutate.mjs --file <path> --find <text> \
@@ -24,7 +25,7 @@ export const stripAnsi = (text) => text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
 export const namesFailedTest = (output, name) =>
   stripAnsi(output)
     .split(/\r?\n/)
-    .some((line) => /^\s*(?:\u2716|not ok\b)/i.test(line) && line.includes(name));
+    .some((line) => /^\s*(?:✖|×|not ok\b|FAIL\s)/i.test(line) && line.includes(name));
 
 export const sameBytes = (left, right) => Buffer.compare(left, right) === 0;
 
