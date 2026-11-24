@@ -9,8 +9,8 @@ Read [CONTRIBUTING.md](.github/CONTRIBUTING.md) before changing this repository.
 
 ## Checks
 
-- `node scripts/validate-skills.mjs`.
-- `node --test "scripts/*.test.mjs"`.
+- `node scripts/validate-skills.mjs`
+- `node --test "scripts/*.test.mjs"`
 - After a change inside a skill folder, run `node scripts/validate-skills.mjs --write-catalog` and commit the updated catalogue.
 - After a description change, run the trigger evals and record the rates in the pull request.
 
