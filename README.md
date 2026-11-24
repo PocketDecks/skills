@@ -8,13 +8,13 @@ Agent skills for working on [PocketDecks](https://github.com/PocketDecks) reposi
 
 ## Install
 
-See [install.md](install.md) for Claude Code, Codex, OpenCode, Command Code, Hermes Agent and manual installation.
+See [INSTALL.md](INSTALL.md) for Claude Code, Codex, OpenCode, Command Code, Hermes Agent and manual installation.
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `install.md` | Install commands for each supported agent |
+| `INSTALL.md` | Install commands for each supported agent |
 | `skills/` | One folder per skill, plus `index.json`, the OpenCode catalogue |
 | `evals/` | Trigger evals for each skill, see [evals/README.md](evals/README.md) |
 | `scripts/validate-skills.mjs` | Checks frontmatter, links, manifests, the catalogue, the evals and the published text |
