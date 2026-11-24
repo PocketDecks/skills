@@ -76,7 +76,9 @@ const killTree = (pid, signal) => {
 };
 
 // Runs the command in its own process group so a timeout or interrupt can stop
-// every descendant, then waits until the group is gone.
+// every descendant. Once the shell exits, the group gets one grace period to
+// release the output pipes before it is killed; a process outside the group
+// that still holds them after a second grace period counts as left running.
 export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
   const child = spawn(command, {
     shell: true,
@@ -86,37 +88,58 @@ export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
   });
   let output = "";
   let timedOut = false;
-  let escalation = null;
-  child.stdout.on("data", (chunk) => {
-    output += chunk;
-  });
-  child.stderr.on("data", (chunk) => {
-    output += chunk;
-  });
+  let exitCode = null;
+  let held = false;
+  let stopping = false;
+  const timers = [];
+  const later = (ms, action) => timers.push(setTimeout(action, ms));
+  for (const stream of [child.stdout, child.stderr]) {
+    stream.setEncoding("utf8");
+    stream.on("data", (chunk) => {
+      output += chunk;
+    });
+  }
   const stop = () => {
     killTree(child.pid, "SIGTERM");
-    escalation ??= setTimeout(() => killTree(child.pid, "SIGKILL"), graceMs);
+    if (stopping) return;
+    stopping = true;
+    later(graceMs, () => killTree(child.pid, "SIGKILL"));
   };
-  const timer = setTimeout(() => {
+  later(timeoutMs, () => {
     timedOut = true;
     stop();
-  }, timeoutMs);
+  });
   const done = new Promise((resolve) => {
-    child.on("close", async (code) => {
-      clearTimeout(timer);
-      clearTimeout(escalation);
+    let finished = false;
+    const finish = async () => {
+      if (finished) return;
+      finished = true;
+      for (const timer of timers) clearTimeout(timer);
       killTree(child.pid, "SIGKILL");
       const deadline = Date.now() + 5000;
       while (process.platform !== "win32" && groupAlive(child.pid) && Date.now() < deadline) {
         await new Promise((wait) => setTimeout(wait, 20));
       }
       resolve({
-        code,
+        code: exitCode,
         output,
         timedOut,
-        treeExited: process.platform === "win32" || !groupAlive(child.pid),
+        treeExited: !held && (process.platform === "win32" || !groupAlive(child.pid)),
+      });
+    };
+    child.on("exit", (code) => {
+      exitCode = code;
+      later(graceMs, () => {
+        killTree(child.pid, "SIGKILL");
+        later(graceMs, () => {
+          held = true;
+          child.stdout.destroy();
+          child.stderr.destroy();
+          finish();
+        });
       });
     });
+    child.on("close", finish);
   });
   return { done, stop };
 };

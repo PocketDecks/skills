@@ -452,3 +452,62 @@ test("kills a background straggler after a normal exit", { skip: process.platfor
   await new Promise((resolve) => setTimeout(resolve, 200));
   assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
 });
+test("matches a marker split across output writes", (t) => {
+  const { dir, invoke } = fixture(t);
+  const split = path.join(dir, "split.cjs");
+  fs.writeFileSync(split, 'process.stdout.write(Buffer.from([0xE2, 0x9C])); setTimeout(() => { process.stdout.write(Buffer.concat([Buffer.from([0x96]), Buffer.from(" keeps the limit at two\\n")])); process.exit(1); }, 200);\n');
+  const { report } = invoke({ test: `node "${split}"`, expect: "keeps the limit at two" });
+  assert.equal(report.killed, true);
+});
+
+test("fails when an escaped child holds the output pipes", { timeout: 30_000, skip: process.platform === "win32" }, async (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const before = fs.readFileSync(target);
+  const pidFile = path.join(dir, "escaped.pid");
+  const childScript = path.join(dir, "escaped.cjs");
+  fs.writeFileSync(childScript, "setTimeout(() => {}, 30000);\n");
+  const parent = path.join(dir, "escape.cjs");
+  fs.writeFileSync(parent, [
+    'const fs = require("node:fs");',
+    'const { spawn } = require("node:child_process");',
+    `const child = spawn(process.execPath, [${JSON.stringify(childScript)}], { stdio: "inherit", detached: true });`,
+    `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+    "child.unref();",
+    "process.exit(1);",
+    "",
+  ].join("\n"));
+  const { result, output } = invoke({ test: `node "${parent}"` });
+  await waitFor(pidFile);
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  t.after(() => { try { process.kill(pid, "SIGKILL"); } catch { /* already gone */ } });
+  assert.equal(result.status, 2);
+  assert.match(output, /left processes running/);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
+
+test("kills a same-group holder after a failing exit", { timeout: 30_000, skip: process.platform === "win32" }, async (t) => {
+  const { dir, invoke } = fixture(t);
+  const pidFile = path.join(dir, "holder.pid");
+  const holder = path.join(dir, "holder.cjs");
+  fs.writeFileSync(holder, "setTimeout(() => {}, 30000);\n");
+  const parent = path.join(dir, "hold.cjs");
+  fs.writeFileSync(parent, [
+    'const fs = require("node:fs");',
+    'const { spawn } = require("node:child_process");',
+    'process.stdout.write("✖ keeps the limit at two\\n");',
+    `const child = spawn(process.execPath, [${JSON.stringify(holder)}], { stdio: "inherit" });`,
+    `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+    "child.unref();",
+    "process.exit(1);",
+    "",
+  ].join("\n"));
+  const { result, report } = invoke({ test: `node "${parent}"`, expect: "keeps the limit at two" });
+  assert.equal(result.status, 0);
+  assert.equal(report.killed, true);
+  assert.equal(report.timedOut, false);
+  await waitFor(pidFile);
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
+});
+
