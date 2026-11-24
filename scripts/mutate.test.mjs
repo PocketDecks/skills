@@ -551,3 +551,18 @@ test("refuses a signal received before the command starts", { timeout: 30_000 },
   assert.match(result.stdout, /"interrupted":"SIGTERM"/);
   assert.deepEqual(fs.readFileSync(target), before);
 });
+
+
+test("restores the file when the command cannot spawn", { timeout: 30_000 }, (t) => {
+  const { dir, target } = fixture(t);
+  const copy = path.join(dir, "mutate-badshell.mjs");
+  const source = fs.readFileSync(script, "utf8");
+  assert.equal(source.split("    shell: true,").length - 1, 1);
+  fs.writeFileSync(copy, source.replace("    shell: true,", '    shell: "/nonexistent/shell",'));
+  const before = fs.readFileSync(target);
+  const argv = ["--file", target, "--find", "= 2", "--replace", "= 3", "--test", 'node -e ""', "--expect", "no test name"];
+  const result = spawnSync(process.execPath, [fs.realpathSync(copy), ...argv], { cwd: dir, encoding: "utf8" });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /ENOENT/);
+  assert.deepEqual(fs.readFileSync(target), before);
+});

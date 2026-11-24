@@ -9,7 +9,8 @@
 // timeout or interrupt. For Vitest, run `yarn vitest run --reporter=verbose
 // <file>` and pass a suite path such as `limits > keeps the limit at two`. A
 // name that matches both a failing and a passing test is refused. TAP todo and
-// skip lines are ignored.
+// skip lines are ignored. A command that cannot spawn exits 2 with the file
+// restored.
 //
 // Usage:
 //   node <skill-dir>/scripts/mutate.mjs --file <path> --find <text> \
@@ -100,10 +101,10 @@ export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
     });
   }
   const stop = () => {
-    killTree(child.pid, "SIGTERM");
+    if (child.pid) killTree(child.pid, "SIGTERM");
     if (stopping) return;
     stopping = true;
-    later(graceMs, () => killTree(child.pid, "SIGKILL"));
+    later(graceMs, () => { if (child.pid) killTree(child.pid, "SIGKILL"); });
   };
   later(timeoutMs, () => {
     timedOut = true;
@@ -115,7 +116,7 @@ export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
       if (finished) return;
       finished = true;
       for (const timer of timers) clearTimeout(timer);
-      killTree(child.pid, "SIGKILL");
+      if (child.pid) killTree(child.pid, "SIGKILL");
       const deadline = Date.now() + 5000;
       while (process.platform !== "win32" && groupAlive(child.pid) && Date.now() < deadline) {
         await new Promise((wait) => setTimeout(wait, 20));
@@ -128,9 +129,10 @@ export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
       });
     };
     child.on("exit", (code) => {
+      if (finished) return;
       exitCode = code;
       later(graceMs, () => {
-        killTree(child.pid, "SIGKILL");
+        if (child.pid) killTree(child.pid, "SIGKILL");
         later(graceMs, () => {
           held = true;
           child.stdout.destroy();
@@ -138,6 +140,12 @@ export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
           finish();
         });
       });
+    });
+    child.on("error", (error) => {
+      if (finished) return;
+      finished = true;
+      for (const timer of timers) clearTimeout(timer);
+      resolve({ code: null, output, timedOut: false, treeExited: true, error });
     });
     child.on("close", finish);
   });
@@ -205,6 +213,7 @@ export const main = async (argv, io = fs) => {
     if (caughtSignal) throw new Error(`interrupted by ${caughtSignal}`);
     running = runCommand(args.test, { env, timeoutMs: args.timeout * 1000 });
     const result = await running.done;
+    if (result.error) throw result.error;
     report.exit = result.code === null ? 1 : result.code;
     report.matched = namesFailedTest(result.output, args.expect);
     if (report.matched && namesPassedTest(result.output, args.expect)) {
