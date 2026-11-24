@@ -59,11 +59,42 @@ test("reports a killed mutant when the named test fails", (t) => {
 
 test("reports a survived mutant when the focused test passes", (t) => {
   const { invoke } = fixture(t);
-  const { result, report } = invoke({ find: "= 2", replace: "= 2" });
+  const { result, report } = invoke({ find: "= limit", replace: "= 0" });
   assert.equal(result.status, 1);
   assert.equal(report.killed, false);
   assert.equal(report.exit, 0);
   assert.equal(report.matched, false);
+});
+
+test("allows an empty replacement for a deletion mutant", (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const side = path.join(dir, "deleted.mjs");
+  const copy = path.join(dir, "copy-delete.cjs");
+  fs.writeFileSync(copy, `require("node:fs").copyFileSync(${JSON.stringify(target)}, ${JSON.stringify(side)});\n`);
+  const { result } = invoke({ find: "= 2", replace: "", test: `node "${copy}"`, expect: "no test name" });
+  assert.equal(result.status, 1);
+  assert.match(fs.readFileSync(side, "utf8"), /export const limit ;/);
+});
+
+test("refuses a no-op mutant with equal find and replace text", (t) => {
+  const { target, invoke } = fixture(t);
+  const before = fs.readFileSync(target);
+  const { result, output } = invoke({ find: "= 2", replace: "= 2" });
+  assert.equal(result.status, 2);
+  assert.match(output, /must differ/);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
+
+test("refuses a repeated flag", (t) => {
+  const { target } = fixture(t);
+  const before = fs.readFileSync(target);
+  const result = spawnSync(process.execPath, [
+    script, "--file", target, "--find", "= 2", "--find", "= 3",
+    "--replace", "= 0", "--test", 'node -e ""', "--expect", "no test name",
+  ], { encoding: "utf8" });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /duplicate argument/);
+  assert.deepEqual(fs.readFileSync(target), before);
 });
 
 test("counts a non-zero exit only when the named test failed", (t) => {

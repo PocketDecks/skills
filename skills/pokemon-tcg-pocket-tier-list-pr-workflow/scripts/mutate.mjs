@@ -43,9 +43,11 @@ const parseArgs = (argv) => {
     args[key] = value;
     index += 1;
   }
-  for (const key of ["file", "find", "replace", "test", "expect"]) {
+  for (const key of ["file", "find", "test", "expect"]) {
     if (!args[key]) throw new Error(`missing required argument: --${key}`);
   }
+  if (args.replace === undefined) throw new Error("missing required argument: --replace");
+  if (args.find === args.replace) throw new Error("--find and --replace must differ");
   const timeout = args.timeout === undefined ? 600 : Number(args.timeout);
   if (!Number.isFinite(timeout) || timeout <= 0) throw new Error("--timeout must be a positive number of seconds");
   args.timeout = timeout;
