@@ -4,7 +4,8 @@
 // Applies one exact mutation to a file, runs a focused test command and reports
 // whether that command failed the named test. The file is restored byte for
 // byte before the report is printed. It recognises node:test, TAP and Vitest
-// failure lines.
+// failure lines. Pass the complete test name to --expect, or its Vitest suite
+// path.
 //
 // Usage:
 //   node <skill-dir>/scripts/mutate.mjs --file <path> --find <text> \
@@ -22,10 +23,19 @@ export const countOccurrences = (text, needle) => text.split(needle).length - 1;
 
 export const stripAnsi = (text) => text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
 
-export const namesFailedTest = (output, name) =>
+const FAILED_LINE = /^\s*(?:✖|×|not ok \d+ -|FAIL)\s+(.+?)\s*$/;
+const TIMING = /\s+(?:\(\d+(?:\.\d+)?ms\)|\d+(?:\.\d+)?m?s)$/;
+const TAP_DIRECTIVE = /\s+#\s.*$/;
+
+export const failedTestIds = (output) =>
   stripAnsi(output)
     .split(/\r?\n/)
-    .some((line) => /^\s*(?:✖|×|not ok\b|FAIL\s)/i.test(line) && line.includes(name));
+    .map((line) => FAILED_LINE.exec(line)?.[1])
+    .filter(Boolean)
+    .flatMap((id) => [...new Set([id, id.replace(TIMING, ""), id.replace(TAP_DIRECTIVE, "")])]);
+
+export const namesFailedTest = (output, name) =>
+  failedTestIds(output).some((id) => id === name || id.endsWith(` > ${name}`));
 
 export const sameBytes = (left, right) => Buffer.compare(left, right) === 0;
 

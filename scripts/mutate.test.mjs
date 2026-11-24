@@ -284,3 +284,42 @@ test("matches a Vitest FAIL line for the failed test", () => {
 test("does not match a Vitest summary line", () => {
   assert.equal(namesFailedTest(" ❯ check.test.ts (2 tests | 1 failed) 3ms", "check.test.ts"), false);
 });
+
+test("matches only the complete node:test name", (t) => {
+  const { dir, invoke } = fixture(t);
+  const target = path.join(dir, "prefix-target.mjs");
+  fs.writeFileSync(target, "export const limit = 2;\nexport const other = 2;\n");
+  const check = path.join(dir, "prefix.test.mjs");
+  fs.writeFileSync(check, [
+    'import test from "node:test";',
+    'import assert from "node:assert/strict";',
+    'import { limit, other } from "./prefix-target.mjs";',
+    'test("keeps the limit at two", () => assert.equal(limit, 2));',
+    'test("keeps the limit at two with missing data", () => assert.equal(other, 2));',
+    "",
+  ].join("\n"));
+  const command = `node --test "${check}"`;
+  const options = { file: target, find: "other = 2", replace: "other = 3", test: command };
+  const short = invoke({ ...options, expect: "keeps the limit at two" });
+  assert.equal(short.result.status, 1);
+  assert.equal(short.report.killed, false);
+  const full = invoke({ ...options, expect: "keeps the limit at two with missing data" });
+  assert.equal(full.result.status, 0);
+  assert.equal(full.report.killed, true);
+});
+
+test("matches the captured node and Vitest failure lines only by full name", () => {
+  const lines = [
+    "  ✖ keeps the limit at two with missing data (0.36154ms)",
+    "    not ok 2 - keeps the limit at two with missing data",
+    "     × keeps the limit at two with missing data 2ms",
+    " × prefix.test.ts > limits > keeps the limit at two with missing data 2ms",
+    " FAIL  prefix.test.ts > limits > keeps the limit at two with missing data",
+  ];
+  for (const line of lines) {
+    assert.equal(namesFailedTest(line, "keeps the limit at two with missing data"), true, line);
+    assert.equal(namesFailedTest(line, "keeps the limit at two"), false, line);
+  }
+  assert.equal(namesFailedTest(lines.at(-1), "limits > keeps the limit at two with missing data"), true);
+});
+
