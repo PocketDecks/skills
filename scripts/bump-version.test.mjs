@@ -100,13 +100,19 @@ test("builds the malformed fixture after a release", { timeout: 30_000 }, (t) =>
 test("rejects a nested version field in package.json", { timeout: 30_000 }, (t) => {
   const { dir, read, run } = fixture(t);
   const file = path.join(dir, "package.json");
-  const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-  parsed.version = "0.9.0";
-  parsed.engines = { version: "1.0.0" };
-  fs.writeFileSync(file, `${JSON.stringify(parsed, null, 2)}\n`);
+  const original = fs.readFileSync(file, "utf8");
+  const current = JSON.parse(original).version;
+  const wrong = current === "0.9.0" ? "0.8.0" : "0.9.0";
+  const parsed = JSON.parse(original);
+  parsed.version = wrong;
+  parsed.engines = { version: current };
+  const changed = `${JSON.stringify(parsed, null, 2)}\n`;
+  assert.notEqual(changed, original);
+  fs.writeFileSync(file, changed);
   const before = read();
   const result = run("1.0.1");
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /package\.json: version is 0\.9\.0, expected 1\.0\.0/);
+  const escaped = current.replaceAll(".", "\\.");
+  assert.match(result.stderr, new RegExp(`package\\.json: version is ${wrong.replaceAll(".", "\\.")}, expected ${escaped}`));
   assert.deepEqual(read(), before);
 });
