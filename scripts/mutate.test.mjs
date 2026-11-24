@@ -51,7 +51,7 @@ const fixture = (t) => {
   return { dir, target, check, invoke };
 };
 
-test("reports a killed mutant when the named test fails", (t) => {
+test("reports a killed mutant when the named test fails", { timeout: 30_000 }, (t) => {
   const { invoke } = fixture(t);
   const { result, report } = invoke();
   assert.equal(result.status, 0);
@@ -60,7 +60,7 @@ test("reports a killed mutant when the named test fails", (t) => {
   assert.equal(report.matched, true);
 });
 
-test("reports a survived mutant when the focused test passes", (t) => {
+test("reports a survived mutant when the focused test passes", { timeout: 30_000 }, (t) => {
   const { invoke } = fixture(t);
   const { result, report } = invoke({ find: "= limit", replace: "= 0" });
   assert.equal(result.status, 1);
@@ -69,7 +69,7 @@ test("reports a survived mutant when the focused test passes", (t) => {
   assert.equal(report.matched, false);
 });
 
-test("allows an empty replacement for a deletion mutant", (t) => {
+test("allows an empty replacement for a deletion mutant", { timeout: 30_000 }, (t) => {
   const { dir, target, invoke } = fixture(t);
   const side = path.join(dir, "deleted.mjs");
   const copy = path.join(dir, "copy-delete.cjs");
@@ -79,7 +79,7 @@ test("allows an empty replacement for a deletion mutant", (t) => {
   assert.match(fs.readFileSync(side, "utf8"), /export const limit ;/);
 });
 
-test("refuses a no-op mutant with equal find and replace text", (t) => {
+test("refuses a no-op mutant with equal find and replace text", { timeout: 30_000 }, (t) => {
   const { target, invoke } = fixture(t);
   const before = fs.readFileSync(target);
   const { result, output } = invoke({ find: "= 2", replace: "= 2" });
@@ -88,7 +88,7 @@ test("refuses a no-op mutant with equal find and replace text", (t) => {
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("refuses a repeated flag", (t) => {
+test("refuses a repeated flag", { timeout: 30_000 }, (t) => {
   const { target } = fixture(t);
   const before = fs.readFileSync(target);
   const result = spawnSync(process.execPath, [
@@ -100,7 +100,7 @@ test("refuses a repeated flag", (t) => {
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("counts a non-zero exit only when the named test failed", (t) => {
+test("counts a non-zero exit only when the named test failed", { timeout: 30_000 }, (t) => {
   const { invoke } = fixture(t);
   const { result, report } = invoke({ expect: "a test that never runs" });
   assert.notEqual(report.exit, 0);
@@ -109,7 +109,7 @@ test("counts a non-zero exit only when the named test failed", (t) => {
   assert.equal(result.status, 1);
 });
 
-test("refuses a find text that occurs twice", (t) => {
+test("refuses a find text that occurs twice", { timeout: 30_000 }, (t) => {
   const { target, invoke } = fixture(t);
   const before = fs.readFileSync(target, "utf8");
   const { result, output } = invoke({ find: "export", replace: "const" });
@@ -118,14 +118,14 @@ test("refuses a find text that occurs twice", (t) => {
   assert.equal(fs.readFileSync(target, "utf8"), before);
 });
 
-test("restores the file after a killed mutant", (t) => {
+test("restores the file after a killed mutant", { timeout: 30_000 }, (t) => {
   const { target, invoke } = fixture(t);
   const before = fs.readFileSync(target);
   invoke();
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("strips ANSI colour before matching the failed test name", (t) => {
+test("strips ANSI colour before matching the failed test name", { timeout: 30_000 }, (t) => {
   const { dir, invoke } = fixture(t);
   const ansi = path.join(dir, "ansi-fail.mjs");
   fs.writeFileSync(ansi, ansiSource);
@@ -135,12 +135,12 @@ test("strips ANSI colour before matching the failed test name", (t) => {
   assert.equal(report.killed, true);
 });
 
-test("detects a byte mismatch", () => {
+test("detects a byte mismatch", { timeout: 30_000 }, () => {
   assert.equal(sameBytes(Buffer.from("abc"), Buffer.from("abc")), true);
   assert.equal(sameBytes(Buffer.from("abc"), Buffer.from("abd")), false);
 });
 
-test("lands a replacement with dollar patterns verbatim", (t) => {
+test("lands a replacement with dollar patterns verbatim", { timeout: 30_000 }, (t) => {
   const { dir, target, invoke } = fixture(t);
   const side = path.join(dir, "side.mjs");
   const copy = path.join(dir, "copy.cjs");
@@ -149,7 +149,7 @@ test("lands a replacement with dollar patterns verbatim", (t) => {
   assert.match(fs.readFileSync(side, "utf8"), /limit = \$&9;/);
 });
 
-test("restores the file when the test command times out", (t) => {
+test("restores the file when the test command times out", { timeout: 30_000 }, (t) => {
   const { dir, target, invoke } = fixture(t);
   const before = fs.readFileSync(target);
   const slow = path.join(dir, "slow.cjs");
@@ -161,7 +161,7 @@ test("restores the file when the test command times out", (t) => {
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("restores the file when interrupted", { skip: process.platform === "win32" }, async (t) => {
+test("restores the file when interrupted", { timeout: 30_000, skip: process.platform === "win32" }, async (t) => {
   const { dir, target } = fixture(t);
   const before = fs.readFileSync(target);
   const marker = path.join(dir, "marker");
@@ -209,13 +209,13 @@ const stubRun = (t, drop) => {
   });
 };
 
-test("reports a failed mutant landing check", (t) => {
+test("reports a failed mutant landing check", { timeout: 30_000 }, (t) => {
   const result = stubRun(t, "first");
   assert.equal(result.status, 2);
   assert.match(result.stderr, /mutant did not land/);
 });
 
-test("reports a failed restore check", (t) => {
+test("reports a failed restore check", { timeout: 30_000 }, (t) => {
   const result = stubRun(t, "restore");
   assert.equal(result.status, 2);
   assert.match(result.stderr, /restore verification failed/);
@@ -223,7 +223,7 @@ test("reports a failed restore check", (t) => {
   assert.equal(report.killed, false);
 });
 
-test("refuses a zero timeout", (t) => {
+test("refuses a zero timeout", { timeout: 30_000 }, (t) => {
   const { target, invoke } = fixture(t);
   const before = fs.readFileSync(target);
   const { result } = invoke({ timeout: "0" });
@@ -231,7 +231,7 @@ test("refuses a zero timeout", (t) => {
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("refuses a non-numeric timeout", (t) => {
+test("refuses a non-numeric timeout", { timeout: 30_000 }, (t) => {
   const { target, invoke } = fixture(t);
   const before = fs.readFileSync(target);
   const { result } = invoke({ timeout: "abc" });
@@ -239,7 +239,7 @@ test("refuses a non-numeric timeout", (t) => {
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("does not count a timed-out run as killed", (t) => {
+test("does not count a timed-out run as killed", { timeout: 30_000 }, (t) => {
   const { dir, invoke } = fixture(t);
   const slow = path.join(dir, "fail-then-sleep.cjs");
   fs.writeFileSync(slow, 'process.stdout.write("\\u2716 keeps the limit at two\\n"); setTimeout(() => {}, 5000);\n');
@@ -250,7 +250,7 @@ test("does not count a timed-out run as killed", (t) => {
   assert.equal(report.killed, false);
 });
 
-test("removes its signal listeners", (t) => {
+test("removes its signal listeners", { timeout: 30_000 }, (t) => {
   const { dir, target } = fixture(t);
   const runner = path.join(dir, "listener.mjs");
   const source = [
@@ -273,19 +273,19 @@ test("removes its signal listeners", (t) => {
   assert.equal(counts.after, counts.before);
 });
 
-test("matches a Vitest cross marker for the failed test", () => {
+test("matches a Vitest cross marker for the failed test", { timeout: 30_000 }, () => {
   assert.equal(namesFailedTest("     × keeps the limit at two 3ms", "keeps the limit at two"), true);
 });
 
-test("matches a Vitest FAIL line for the failed test", () => {
+test("matches a Vitest FAIL line for the failed test", { timeout: 30_000 }, () => {
   assert.equal(namesFailedTest(" FAIL  check.test.ts > limits > keeps the limit at two", "keeps the limit at two"), true);
 });
 
-test("does not match a Vitest summary line", () => {
+test("does not match a Vitest summary line", { timeout: 30_000 }, () => {
   assert.equal(namesFailedTest(" ❯ check.test.ts (2 tests | 1 failed) 3ms", "check.test.ts"), false);
 });
 
-test("matches only the complete node:test name", (t) => {
+test("matches only the complete node:test name", { timeout: 30_000 }, (t) => {
   const { dir, invoke } = fixture(t);
   const target = path.join(dir, "prefix-target.mjs");
   fs.writeFileSync(target, "export const limit = 2;\nexport const other = 2;\n");
@@ -308,7 +308,7 @@ test("matches only the complete node:test name", (t) => {
   assert.equal(full.report.killed, true);
 });
 
-test("matches the captured node and Vitest failure lines only by full name", () => {
+test("matches the captured node and Vitest failure lines only by full name", { timeout: 30_000 }, () => {
   const lines = [
     "  ✖ keeps the limit at two with missing data (0.36154ms)",
     "    not ok 2 - keeps the limit at two with missing data",
@@ -331,7 +331,7 @@ const waitFor = async (pathToWait, timeoutMs = 5000) => {
   assert.ok(fs.existsSync(pathToWait), `expected ${pathToWait}`);
 };
 
-test("stops the runner on a SIGTERM sent to it alone", { skip: process.platform === "win32" }, async (t) => {
+test("stops the runner on a SIGTERM sent to it alone", { timeout: 30_000, skip: process.platform === "win32" }, async (t) => {
   const { dir, target } = fixture(t);
   const before = fs.readFileSync(target);
   const marker = path.join(dir, "sigterm.marker");
@@ -354,7 +354,7 @@ test("stops the runner on a SIGTERM sent to it alone", { skip: process.platform 
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("kills a descendant left by a timed-out command", { skip: process.platform === "win32" }, async (t) => {
+test("kills a descendant left by a timed-out command", { timeout: 30_000, skip: process.platform === "win32" }, async (t) => {
   const { dir, target, invoke } = fixture(t);
   const before = fs.readFileSync(target);
   const pidFile = path.join(dir, "descendant.pid");
@@ -378,7 +378,29 @@ test("kills a descendant left by a timed-out command", { skip: process.platform 
   assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
 });
 
-test("ignores a failing TAP todo line", (t) => {
+test("kills a background straggler after a normal exit", { timeout: 30_000, skip: process.platform === "win32" }, async (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const pidFile = path.join(dir, "straggler.pid");
+  const childScript = path.join(dir, "straggler.cjs");
+  const parentScript = path.join(dir, "launch.cjs");
+  fs.writeFileSync(childScript, "setTimeout(() => {}, 30000);\n");
+  fs.writeFileSync(parentScript, [
+    'const fs = require("node:fs");',
+    'const { spawn } = require("node:child_process");',
+    `const child = spawn(process.execPath, [${JSON.stringify(childScript)}], { stdio: "ignore" });`,
+    `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+    "child.unref();",
+    "",
+  ].join("\n"));
+  invoke({ test: `node "${parentScript}"` });
+  await waitFor(pidFile);
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
+});
+
+
+test("ignores a failing TAP todo line", { timeout: 30_000 }, (t) => {
   const { dir, invoke } = fixture(t);
   assert.equal(namesFailedTest("not ok 1 - keeps the limit at two # TODO pending fix", "keeps the limit at two"), false);
   assert.equal(namesFailedTest("not ok 1 - keeps the limit at two # TODO pending fix", "keeps the limit at two # TODO pending fix"), false);
@@ -396,7 +418,7 @@ test("ignores a failing TAP todo line", (t) => {
   assert.equal(report.killed, false);
 });
 
-test("refuses a name used by a passing and a failing test", (t) => {
+test("refuses a name used by a passing and a failing test", { timeout: 30_000 }, (t) => {
   const { dir, invoke } = fixture(t);
   const target = path.join(dir, "duplicate-target.mjs");
   fs.writeFileSync(target, "export const a = 1;\nexport const b = 2;\n");
@@ -417,7 +439,7 @@ test("refuses a name used by a passing and a failing test", (t) => {
   assert.match(output, /names both a failing and a passing test/);
 });
 
-test("matches captured Vitest verbose lines", () => {
+test("matches captured Vitest verbose lines", { timeout: 30_000 }, () => {
   const output = [
     " ✓ dup.test.ts > A > rejects empty 1ms",
     " × dup.test.ts > B > rejects empty 2ms",
@@ -428,31 +450,11 @@ test("matches captured Vitest verbose lines", () => {
   assert.equal(namesFailedTest(output, "B > rejects empty"), true);
 });
 
-test("does not apply suite paths to TAP names", () => {
+test("does not apply suite paths to TAP names", { timeout: 30_000 }, () => {
   assert.equal(namesFailedTest("not ok 2 - longer > keeps the limit at two", "keeps the limit at two"), false);
 });
 
-test("kills a background straggler after a normal exit", { skip: process.platform === "win32" }, async (t) => {
-  const { dir, target, invoke } = fixture(t);
-  const pidFile = path.join(dir, "straggler.pid");
-  const childScript = path.join(dir, "straggler.cjs");
-  const parentScript = path.join(dir, "launch.cjs");
-  fs.writeFileSync(childScript, "setTimeout(() => {}, 30000);\n");
-  fs.writeFileSync(parentScript, [
-    'const fs = require("node:fs");',
-    'const { spawn } = require("node:child_process");',
-    `const child = spawn(process.execPath, [${JSON.stringify(childScript)}], { stdio: "ignore" });`,
-    `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
-    "child.unref();",
-    "",
-  ].join("\n"));
-  invoke({ test: `node "${parentScript}"` });
-  await waitFor(pidFile);
-  const pid = Number(fs.readFileSync(pidFile, "utf8"));
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
-});
-test("matches a marker split across output writes", (t) => {
+test("matches a marker split across output writes", { timeout: 30_000 }, (t) => {
   const { dir, invoke } = fixture(t);
   const split = path.join(dir, "split.cjs");
   fs.writeFileSync(split, 'process.stdout.write(Buffer.from([0xE2, 0x9C])); setTimeout(() => { process.stdout.write(Buffer.concat([Buffer.from([0x96]), Buffer.from(" keeps the limit at two\\n")])); process.exit(1); }, 200);\n');
@@ -511,3 +513,41 @@ test("kills a same-group holder after a failing exit", { timeout: 30_000, skip: 
   assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
 });
 
+test("escalates to SIGKILL for a SIGTERM-ignoring command", { timeout: 30_000 }, (t) => {
+  const { invoke } = fixture(t);
+  const started = Date.now();
+  const { result, report } = invoke({
+    timeout: "1",
+    test: 'node -e "process.on(\'SIGTERM\',()=>{}); setInterval(()=>{},1000)"',
+  });
+  assert.equal(report.timedOut, true);
+  assert.equal(result.status, 1);
+  assert.ok(Date.now() - started < 8000);
+});
+
+test("refuses a signal received before the command starts", { timeout: 30_000 }, (t) => {
+  const { dir, target } = fixture(t);
+  const before = fs.readFileSync(target);
+  const marker = path.join(dir, "prestart.marker");
+  const commandScript = path.join(dir, "prestart-command.cjs");
+  fs.writeFileSync(commandScript, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ready");\n`);
+  const command = `node "${commandScript}"`;
+  const runner = path.join(dir, "prestart.mjs");
+  fs.writeFileSync(runner, [
+    'import fs from "node:fs";',
+    `import { main } from ${JSON.stringify(script)};`,
+    "const io = {",
+    "  readFileSync: fs.readFileSync,",
+    '  writeFileSync: (file, data) => { process.emit("SIGTERM", "SIGTERM"); return fs.writeFileSync(file, data); },',
+    "};",
+    "process.exitCode = await main(JSON.parse(process.env.ARGV), io);",
+    "",
+  ].join("\n"));
+  const argv = ["--file", target, "--find", "= 2", "--replace", "= 3", "--test", command, "--expect", "no test name"];
+  const result = spawnSync(process.execPath, [runner], {
+    cwd: dir, encoding: "utf8", env: { ...process.env, ARGV: JSON.stringify(argv) },
+  });
+  assert.equal(fs.existsSync(marker), false);
+  assert.match(result.stdout, /"interrupted":"SIGTERM"/);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
