@@ -25,6 +25,7 @@ Variations:
 - A mutant that survives because another guard enforces the same bound is equivalent, not a gap. Name the subsuming guard and report it as equivalent instead of adding tests or weakening guards
 - A mutation-sweep row reported as skipped never applied. Repair its target text and rerun before concluding anything about the code
 - Mutants that break a cleanup path can leave staging directories in the temp directory. Remove them before the next run so they do not shift its baseline
+- A table of killed mutants proves the tests catch the cases someone listed, not that the list was complete. Before reporting, probe the inputs nobody wrote: the nearest wrong answer for each matcher, a signal to one process and a forked child for each spawned command, a malformed copy of each file a script rewrites, and the state after the next release or data refresh
 
 ## Fixtures that can tell right from wrong
 
@@ -36,6 +37,9 @@ Variations:
 - Sweep real data for a bug class. `src/pages/deck/__tests__/DeckDetailPage.real-data-cut.test.tsx` cuts the lead card of every deck in `public/data/best-decks.json`; hand-picked fixtures need luck to hit the deck and card that cross a threshold
 - An assertion that cannot fail is worse than none. `assert.ok(x !== undefined || route !== "/")` passes for every input; loop the whole set and assert the outcome both ways, as in `(jsonLd !== undefined) === (route === "/")`
 - When a test asserts an absence, name the input that makes the absence meaningful
+- Test every name, ID or path matcher with a near miss that shares the prefix, such as a failing `X with missing data` beside a passing `X`. A substring match counts the near miss as the target
+- Take another tool's output from a real run of that tool. A parser for Vitest, `gh` or `git` output that is tested only on invented lines misses the real markers, such as Vitest's `×` and `FAIL` lines
+- Derive today's value (a version, a date, a count) from the fixture itself, and assert that the fixture edit changed the text. A hard-coded `1.0.0` passes until the next bump and then fails the suite
 
 ## Tests that only look like tests
 
@@ -62,6 +66,8 @@ Variations:
 - Keep env-loading modules pure and put automatic loading in a separate side-effect module (`analysis/src/load-env.ts` beside `load-env-side-effect.ts`). An import that loads `.env` itself reads the developer's values before a test injects its fixture
 - When a helper behaves differently under a symlinked ancestor, wrap test temp roots in `fs.realpathSync(fs.mkdtempSync(...))`, and prove each wrapper is load-bearing by unwrapping every site, not one
 - Publishing by renaming a directory into place deletes untracked files the old generation held. Say in the report how many went
+- Feed every script that rewrites a structured file a truncated, a duplicated and an invalid copy, and require a refusal before the first write
+- For code that spawns a command with a timeout or signal handling, send the signal to the script's own PID, not its process group, and have the command start a child that records its PID. Assert the script stops at once, restores its state and leaves no child running. A group signal kills the command by itself and hides a handler that never ran
 
 ## Measuring and constants
 
