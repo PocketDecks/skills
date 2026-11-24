@@ -46,18 +46,6 @@ test("moves all four manifests together", (t) => {
   assert.equal(validator.status, 0, validator.stdout + validator.stderr);
 });
 
-test("rejects a truncated manifest without writing any file", (t) => {
-  const { dir, read, run } = fixture(t);
-  const file = path.join(dir, "package.json");
-  const text = fs.readFileSync(file, "utf8");
-  fs.writeFileSync(file, text.replace(/}\s*$/, ""));
-  const before = read();
-  const result = run("1.0.1");
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /not valid JSON/);
-  assert.deepEqual(read(), before);
-});
-
 test("rejects a two-part version", (t) => {
   const { read, run } = fixture(t);
   const before = read();
@@ -70,7 +58,38 @@ test("leaves every file untouched when a later manifest is malformed", (t) => {
   const { dir, read, run } = fixture(t);
   const file = path.join(dir, ".codex-plugin", "plugin.json");
   const text = fs.readFileSync(file, "utf8");
-  fs.writeFileSync(file, text.replace('"version": "1.0.0"', '"version": "1.0.0",\n  "version": "1.0.0"'));
+  const field = `"version": "${JSON.parse(text).version}"`;
+  const broken = text.replace(field, `${field},\n  ${field}`);
+  assert.notEqual(broken, text);
+  fs.writeFileSync(file, broken);
+  const before = read();
+  const result = run("2.0.0");
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(read(), before);
+});
+
+test("rejects a truncated manifest without writing any file", (t) => {
+  const { dir, read, run } = fixture(t);
+  const file = path.join(dir, "package.json");
+  const text = fs.readFileSync(file, "utf8");
+  fs.writeFileSync(file, text.replace(/}\s*$/, ""));
+  const before = read();
+  const result = run("1.0.1");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /not valid JSON/);
+  assert.deepEqual(read(), before);
+});
+
+test("builds the malformed fixture after a release", (t) => {
+  const { dir, read, run } = fixture(t);
+  const first = run("1.2.3");
+  assert.equal(first.status, 0, first.stderr);
+  const file = path.join(dir, ".codex-plugin", "plugin.json");
+  const text = fs.readFileSync(file, "utf8");
+  const field = `"version": "${JSON.parse(text).version}"`;
+  const broken = text.replace(field, `${field},\n  ${field}`);
+  assert.notEqual(broken, text);
+  fs.writeFileSync(file, broken);
   const before = read();
   const result = run("2.0.0");
   assert.notEqual(result.status, 0);
