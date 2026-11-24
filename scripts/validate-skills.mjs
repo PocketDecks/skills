@@ -332,6 +332,29 @@ const checkEvals = (root, names, problems) => {
   }
 };
 
+const checkPublishManifest = (root, names, problems) => {
+  const relative = path.join(SKILLS_DIR, "publish-manifest.json");
+  const manifest = readJson(root, relative, problems);
+  if (!manifest) return;
+  if (!names.includes(manifest.skill)) {
+    problems.push(`${relative}: skill "${manifest.skill}" is not a folder in ${SKILLS_DIR}/`);
+    return;
+  }
+  if (!Array.isArray(manifest.published)) {
+    problems.push(`${relative}: published must be an array`);
+    return;
+  }
+  const expected = buildCatalog(root).skills.find((entry) => entry.name === manifest.skill)?.files ?? [];
+  const listed = new Set(manifest.published);
+  const wanted = new Set(expected);
+  for (const file of expected) {
+    if (!listed.has(file)) problems.push(`${relative}: missing ${file}`);
+  }
+  for (const file of manifest.published) {
+    if (!wanted.has(file)) problems.push(`${relative}: extra ${file}`);
+  }
+};
+
 export const validate = (root) => {
   const problems = [];
   const names = skillNames(root);
@@ -343,6 +366,7 @@ export const validate = (root) => {
   checkManifests(root, problems);
   checkPackages(root, names, problems);
   checkCatalog(root, problems);
+  checkPublishManifest(root, names, problems);
   checkEvals(root, names, problems);
   return problems;
 };

@@ -283,3 +283,34 @@ test("rejects a missing Hermes or Command Code manifest", () => {
 test("rejects a repository with no skills", () => {
   expectProblem(problemsAfter((root) => fs.rmSync(path.join(root, "skills", skill), { recursive: true }), { catalog: false }), /skills: no skills found/);
 });
+
+test("rejects a publish manifest that misses a shipped file", () => {
+  const problems = problemsAfter((root) => editJson(root, "skills/publish-manifest.json", (json) => ({
+    ...json,
+    published: json.published.filter((file) => file !== "scripts/mutate.mjs"),
+  })));
+  expectProblem(problems, /publish-manifest\.json: missing scripts\/mutate\.mjs/);
+});
+
+test("rejects a publish manifest with an extra file", () => {
+  const problems = problemsAfter((root) => editJson(root, "skills/publish-manifest.json", (json) => ({
+    ...json,
+    published: [...json.published, "scripts/extra.mjs"],
+  })));
+  expectProblem(problems, /publish-manifest\.json: extra scripts\/extra\.mjs/);
+});
+
+test("reports a broken catalogue without throwing", () => {
+  const problems = problemsAfter((root) => fs.writeFileSync(path.join(root, "skills", "index.json"), '{"skills": ['), { catalog: false });
+  expectProblem(problems, /skills\/index\.json: out of date/);
+});
+
+test("rejects a publish manifest naming an unknown skill", () => {
+  const problems = problemsAfter((root) => editJson(root, "skills/publish-manifest.json", (json) => ({ ...json, skill: "no-such-skill" })));
+  expectProblem(problems, /is not a folder/);
+});
+
+test("rejects a publish manifest with a non-array list", () => {
+  const problems = problemsAfter((root) => editJson(root, "skills/publish-manifest.json", (json) => ({ ...json, published: "all" })));
+  expectProblem(problems, /published must be an array/);
+});

@@ -19,6 +19,7 @@ This repository publishes agent skills. People and models both read every change
    ```
 
 4. If you changed a skill's `description`, rerun its trigger evals (see [evals/README.md](../evals/README.md)) and say in the pull request how the trigger rates moved.
+5. To cut a release, run `node scripts/bump-version.mjs <MAJOR.MINOR.PATCH>` from the repository root.
 
 ## Writing skill text
 
@@ -27,6 +28,7 @@ This repository publishes agent skills. People and models both read every change
 - Use British English, straight quotes and no em dashes.
 - Never include local paths, personal email addresses, tokens or the names of private tools.
 - Keep `SKILL.md` lean. Put detail in `references/` and name each reference file in `SKILL.md`.
+- Promote reviewed content from a Hermes profile through [skills/publish-manifest.json](../skills/publish-manifest.json). Keep local profile paths out of the repository.
 
 ## Commits and pull requests
 
