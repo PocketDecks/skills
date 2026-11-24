@@ -7,9 +7,10 @@
 //
 // Usage:
 //   node <skill-dir>/scripts/mutate.mjs --file <path> --find <text> \
-//     --replace <text> --test "<command>" --expect "<test name>"
+//     --replace <text> --test "<command>" --expect "<test name>" \
+//     [--timeout <seconds>]
 //
-// Exit codes: 0 killed, 1 survived, 2 setup error.
+// Exit codes: 0 killed, 1 survived or timed out, 2 setup error or interrupt.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -28,7 +29,7 @@ export const namesFailedTest = (output, name) =>
 export const sameBytes = (left, right) => Buffer.compare(left, right) === 0;
 
 const parseArgs = (argv) => {
-  const keys = ["file", "find", "replace", "test", "expect"];
+  const keys = ["file", "find", "replace", "test", "expect", "timeout"];
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -42,17 +43,22 @@ const parseArgs = (argv) => {
     args[key] = value;
     index += 1;
   }
-  for (const key of keys) {
+  for (const key of ["file", "find", "replace", "test", "expect"]) {
     if (!args[key]) throw new Error(`missing required argument: --${key}`);
   }
+  const timeout = args.timeout === undefined ? 600 : Number(args.timeout);
+  if (!Number.isFinite(timeout) || timeout <= 0) throw new Error("--timeout must be a positive number of seconds");
+  args.timeout = timeout;
   return args;
 };
 
-const main = () => {
+const main = async () => {
   let args = null;
   let backup = null;
   let code = 2;
-  const report = { file: null, killed: false, exit: null, matched: false };
+  const report = { file: null, killed: false, exit: null, matched: false, timedOut: false, interrupted: null };
+  const handlers = {};
+  let caughtSignal = null;
   try {
     args = parseArgs(process.argv.slice(2));
     report.file = args.file;
@@ -61,6 +67,12 @@ const main = () => {
     if (countOccurrences(original, args.find) !== 1) {
       throw new Error(`--find must occur exactly once in ${args.file}`);
     }
+    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+      handlers[signal] = () => {
+        caughtSignal = signal;
+      };
+      process.on(signal, handlers[signal]);
+    }
     const mutated = Buffer.from(original.replace(args.find, () => args.replace));
     fs.writeFileSync(args.file, mutated);
     if (!sameBytes(fs.readFileSync(args.file), mutated)) {
@@ -68,11 +80,19 @@ const main = () => {
     }
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;
-    const result = spawnSync(args.test, { shell: true, encoding: "utf8", env });
+    const result = spawnSync(args.test, {
+      shell: true,
+      encoding: "utf8",
+      env,
+      timeout: args.timeout * 1000,
+      killSignal: "SIGKILL",
+    });
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     report.exit = result.status === null ? 1 : result.status;
     report.matched = namesFailedTest(output, args.expect);
-    report.killed = report.exit !== 0 && report.matched;
+    report.timedOut = result.error?.code === "ETIMEDOUT";
+    report.killed = !report.timedOut && report.exit !== 0 && report.matched;
+    await new Promise((resolve) => setImmediate(resolve));
     code = report.killed ? 0 : 1;
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
@@ -92,11 +112,21 @@ const main = () => {
         code = 2;
       }
     }
+    for (const [signal, handler] of Object.entries(handlers)) {
+      process.removeListener(signal, handler);
+    }
+    if (caughtSignal) {
+      report.interrupted = caughtSignal;
+      report.killed = false;
+      code = 2;
+    }
   }
   process.stdout.write(`${JSON.stringify(report)}\n`);
   return code;
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  process.exitCode = main();
+  main().then((value) => {
+    process.exitCode = value;
+  });
 }

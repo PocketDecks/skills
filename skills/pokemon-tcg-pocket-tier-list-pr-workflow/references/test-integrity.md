@@ -13,7 +13,7 @@ Run it for every test that claims to guard a behaviour
 5. Restore in a `finally` block, check each file equals its backup byte for byte, and check `git status --short` shows only intended changes
 6. Report the mutant and the test that failed. "21 passed" is not evidence
 
-Run the proof with `node <skill-dir>/scripts/mutate.mjs --file <path> --find <old> --replace <new> --test "<command>" --expect "<test name>"`; it restores the file and prints one JSON line with killed, exit and matched
+Run the proof with `node <skill-dir>/scripts/mutate.mjs --file <path> --find <old> --replace <new> --test "<command>" --expect "<test name>" [--timeout <seconds>]`; it restores the file and prints one JSON line with killed, exit, matched, timedOut and interrupted
 
 Variations:
 

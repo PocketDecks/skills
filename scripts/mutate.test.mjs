@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { sameBytes } from "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -113,4 +113,41 @@ test("lands a replacement with dollar patterns verbatim", (t) => {
   fs.writeFileSync(copy, `require("node:fs").copyFileSync(${JSON.stringify(target)}, ${JSON.stringify(side)});\n`);
   invoke({ find: "= 2", replace: "= $&9", test: `node "${copy}"`, expect: "no test name" });
   assert.match(fs.readFileSync(side, "utf8"), /limit = \$&9;/);
+});
+
+test("restores the file when the test command times out", (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const before = fs.readFileSync(target);
+  const slow = path.join(dir, "slow.cjs");
+  fs.writeFileSync(slow, "setTimeout(() => {}, 5000);\n");
+  const { result, report } = invoke({ timeout: "1", test: `node "${slow}"` });
+  assert.equal(result.status, 1);
+  assert.equal(report.timedOut, true);
+  assert.equal(report.killed, false);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
+
+test("restores the file when interrupted", async (t) => {
+  const { dir, target } = fixture(t);
+  const before = fs.readFileSync(target);
+  const marker = path.join(dir, "marker");
+  const slow = path.join(dir, "signal.cjs");
+  fs.writeFileSync(slow, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ready"); setTimeout(() => {}, 5000);\n`);
+  const argv = [
+    "--file", target, "--find", "= 2", "--replace", "= 3",
+    "--test", `node "${slow}"`, "--expect", "no test name", "--timeout", "10",
+  ];
+  const child = spawn(process.execPath, [script, ...argv], { detached: true, stdio: ["ignore", "pipe", "pipe"] });
+  let output = "";
+  child.stdout.on("data", (chunk) => { output += chunk; });
+  const deadline = Date.now() + 5000;
+  while (!fs.existsSync(marker) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(fs.existsSync(marker), true);
+  process.kill(-child.pid, "SIGINT");
+  const code = await new Promise((resolve) => child.on("exit", resolve));
+  assert.equal(code, 2);
+  assert.match(output, /"interrupted":"SIGINT"/);
+  assert.deepEqual(fs.readFileSync(target), before);
 });
