@@ -323,3 +323,78 @@ test("matches the captured node and Vitest failure lines only by full name", () 
   assert.equal(namesFailedTest(lines.at(-1), "limits > keeps the limit at two with missing data"), true);
 });
 
+const waitFor = async (pathToWait, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (!fs.existsSync(pathToWait) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.ok(fs.existsSync(pathToWait), `expected ${pathToWait}`);
+};
+
+test("stops the runner on a SIGTERM sent to it alone", { skip: process.platform === "win32" }, async (t) => {
+  const { dir, target } = fixture(t);
+  const before = fs.readFileSync(target);
+  const marker = path.join(dir, "sigterm.marker");
+  const slow = path.join(dir, "sigterm.cjs");
+  fs.writeFileSync(slow, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ready"); setTimeout(() => {}, 30000);\n`);
+  const argv = [
+    "--file", target, "--find", "= 2", "--replace", "= 3",
+    "--test", `node "${slow}"`, "--expect", "no test name", "--timeout", "60",
+  ];
+  const child = spawn(process.execPath, [script, ...argv], { stdio: ["ignore", "pipe", "pipe"] });
+  let output = "";
+  child.stdout.on("data", (chunk) => { output += chunk; });
+  await waitFor(marker);
+  process.kill(child.pid, "SIGTERM");
+  const started = Date.now();
+  const code = await new Promise((resolve) => child.on("exit", resolve));
+  assert.equal(code, 2);
+  assert.ok(Date.now() - started < 10000);
+  assert.match(output, /"interrupted":"SIGTERM"/);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
+
+test("kills a descendant left by a timed-out command", { skip: process.platform === "win32" }, async (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const before = fs.readFileSync(target);
+  const pidFile = path.join(dir, "descendant.pid");
+  const childScript = path.join(dir, "descendant.cjs");
+  const parentScript = path.join(dir, "spawner.cjs");
+  fs.writeFileSync(childScript, "setTimeout(() => {}, 30000);\n");
+  fs.writeFileSync(parentScript, [
+    'const fs = require("node:fs");',
+    'const { spawn } = require("node:child_process");',
+    `const child = spawn(process.execPath, [${JSON.stringify(childScript)}], { stdio: "ignore" });`,
+    `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+    "setInterval(() => {}, 1000);",
+    "",
+  ].join("\n"));
+  const { report } = invoke({ timeout: "1", test: `node "${parentScript}"` });
+  assert.equal(report.timedOut, true);
+  assert.deepEqual(fs.readFileSync(target), before);
+  await waitFor(pidFile);
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
+});
+
+test("kills a background straggler after a normal exit", { skip: process.platform === "win32" }, async (t) => {
+  const { dir, target, invoke } = fixture(t);
+  const pidFile = path.join(dir, "straggler.pid");
+  const childScript = path.join(dir, "straggler.cjs");
+  const parentScript = path.join(dir, "launch.cjs");
+  fs.writeFileSync(childScript, "setTimeout(() => {}, 30000);\n");
+  fs.writeFileSync(parentScript, [
+    'const fs = require("node:fs");',
+    'const { spawn } = require("node:child_process");',
+    `const child = spawn(process.execPath, [${JSON.stringify(childScript)}], { stdio: "ignore" });`,
+    `fs.writeFileSync(${JSON.stringify(pidFile)}, String(child.pid));`,
+    "child.unref();",
+    "",
+  ].join("\n"));
+  invoke({ test: `node "${parentScript}"` });
+  await waitFor(pidFile);
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
+});

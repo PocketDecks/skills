@@ -5,7 +5,8 @@
 // whether that command failed the named test. The file is restored byte for
 // byte before the report is printed. It recognises node:test, TAP and Vitest
 // failure lines. Pass the complete test name to --expect, or its Vitest suite
-// path.
+// path. The test command runs in its own process group, which is stopped on a
+// timeout or interrupt.
 //
 // Usage:
 //   node <skill-dir>/scripts/mutate.mjs --file <path> --find <text> \
@@ -16,7 +17,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 export const countOccurrences = (text, needle) => text.split(needle).length - 1;
@@ -36,6 +37,73 @@ export const failedTestIds = (output) =>
 
 export const namesFailedTest = (output, name) =>
   failedTestIds(output).some((id) => id === name || id.endsWith(` > ${name}`));
+
+const groupAlive = (pid) => {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const killTree = (pid, signal) => {
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    // The process group has already exited.
+  }
+};
+
+// Runs the command in its own process group so a timeout or interrupt can stop
+// every descendant, then waits until the group is gone.
+export const runCommand = (command, { env, timeoutMs, graceMs = 2000 }) => {
+  const child = spawn(command, {
+    shell: true,
+    env,
+    detached: process.platform !== "win32",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  let timedOut = false;
+  let escalation = null;
+  child.stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk;
+  });
+  const stop = () => {
+    killTree(child.pid, "SIGTERM");
+    escalation ??= setTimeout(() => killTree(child.pid, "SIGKILL"), graceMs);
+  };
+  const timer = setTimeout(() => {
+    timedOut = true;
+    stop();
+  }, timeoutMs);
+  const done = new Promise((resolve) => {
+    child.on("close", async (code) => {
+      clearTimeout(timer);
+      clearTimeout(escalation);
+      killTree(child.pid, "SIGKILL");
+      const deadline = Date.now() + 5000;
+      while (process.platform !== "win32" && groupAlive(child.pid) && Date.now() < deadline) {
+        await new Promise((wait) => setTimeout(wait, 20));
+      }
+      resolve({
+        code,
+        output,
+        timedOut,
+        treeExited: process.platform === "win32" || !groupAlive(child.pid),
+      });
+    });
+  });
+  return { done, stop };
+};
 
 export const sameBytes = (left, right) => Buffer.compare(left, right) === 0;
 
@@ -72,6 +140,7 @@ export const main = async (argv, io = fs) => {
   const report = { file: null, killed: false, exit: null, matched: false, timedOut: false, interrupted: null };
   const handlers = {};
   let caughtSignal = null;
+  let running = null;
   try {
     args = parseArgs(argv);
     report.file = args.file;
@@ -82,7 +151,8 @@ export const main = async (argv, io = fs) => {
     }
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       handlers[signal] = () => {
-        caughtSignal = signal;
+        caughtSignal ??= signal;
+        running?.stop();
       };
       process.on(signal, handlers[signal]);
     }
@@ -93,19 +163,14 @@ export const main = async (argv, io = fs) => {
     }
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;
-    const result = spawnSync(args.test, {
-      shell: true,
-      encoding: "utf8",
-      env,
-      timeout: args.timeout * 1000,
-      killSignal: "SIGKILL",
-    });
-    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-    report.exit = result.status === null ? 1 : result.status;
-    report.matched = namesFailedTest(output, args.expect);
-    report.timedOut = result.error?.code === "ETIMEDOUT";
+    if (caughtSignal) throw new Error(`interrupted by ${caughtSignal}`);
+    running = runCommand(args.test, { env, timeoutMs: args.timeout * 1000 });
+    const result = await running.done;
+    report.exit = result.code === null ? 1 : result.code;
+    report.matched = namesFailedTest(result.output, args.expect);
+    report.timedOut = result.timedOut;
+    if (!result.treeExited) throw new Error("the test command left processes running");
     report.killed = !report.timedOut && report.exit !== 0 && report.matched;
-    await new Promise((resolve) => setImmediate(resolve));
     code = report.killed ? 0 : 1;
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
