@@ -151,3 +151,40 @@ test("restores the file when interrupted", async (t) => {
   assert.match(output, /"interrupted":"SIGINT"/);
   assert.deepEqual(fs.readFileSync(target), before);
 });
+
+const stubRun = (t, drop) => {
+  const { dir, target } = fixture(t);
+  const runner = path.join(dir, "runner.mjs");
+  const source = [
+    'import fs from "node:fs";',
+    `import { main } from ${JSON.stringify(script)};`,
+    "let writes = 0;",
+    "const io = {",
+    "  readFileSync: fs.readFileSync,",
+    `  writeFileSync: (file, data) => { writes += 1; if (${JSON.stringify(drop)} === "first" && writes === 1) return; if (${JSON.stringify(drop)} === "restore" && writes === 2) return; return fs.writeFileSync(file, data); },`,
+    "};",
+    "process.exitCode = await main(JSON.parse(process.env.ARGV), io);",
+    "",
+  ].join("\n");
+  fs.writeFileSync(runner, source);
+  const argv = ["--file", target, "--find", "= 2", "--replace", "= 3", "--test", 'node -e ""', "--expect", "no test name"];
+  return spawnSync(process.execPath, [runner], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, DROP_WRITE: drop, ARGV: JSON.stringify(argv) },
+  });
+};
+
+test("reports a failed mutant landing check", (t) => {
+  const result = stubRun(t, "first");
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /mutant did not land/);
+});
+
+test("reports a failed restore check", (t) => {
+  const result = stubRun(t, "restore");
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /restore verification failed/);
+  const report = JSON.parse(result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
+  assert.equal(report.killed, false);
+});

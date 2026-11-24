@@ -52,7 +52,7 @@ const parseArgs = (argv) => {
   return args;
 };
 
-const main = async () => {
+export const main = async (argv, io = fs) => {
   let args = null;
   let backup = null;
   let code = 2;
@@ -60,9 +60,9 @@ const main = async () => {
   const handlers = {};
   let caughtSignal = null;
   try {
-    args = parseArgs(process.argv.slice(2));
+    args = parseArgs(argv);
     report.file = args.file;
-    backup = fs.readFileSync(args.file);
+    backup = io.readFileSync(args.file);
     const original = backup.toString("utf8");
     if (countOccurrences(original, args.find) !== 1) {
       throw new Error(`--find must occur exactly once in ${args.file}`);
@@ -74,8 +74,8 @@ const main = async () => {
       process.on(signal, handlers[signal]);
     }
     const mutated = Buffer.from(original.replace(args.find, () => args.replace));
-    fs.writeFileSync(args.file, mutated);
-    if (!sameBytes(fs.readFileSync(args.file), mutated)) {
+    io.writeFileSync(args.file, mutated);
+    if (!sameBytes(io.readFileSync(args.file), mutated)) {
       throw new Error(`mutant did not land in ${args.file}`);
     }
     const env = { ...process.env };
@@ -100,8 +100,8 @@ const main = async () => {
   } finally {
     if (args && backup) {
       try {
-        fs.writeFileSync(args.file, backup);
-        if (!sameBytes(fs.readFileSync(args.file), backup)) {
+        io.writeFileSync(args.file, backup);
+        if (!sameBytes(io.readFileSync(args.file), backup)) {
           process.stderr.write("restore verification failed\n");
           report.killed = false;
           code = 2;
@@ -126,7 +126,7 @@ const main = async () => {
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().then((value) => {
+  main(process.argv.slice(2)).then((value) => {
     process.exitCode = value;
   });
 }
