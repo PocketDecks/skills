@@ -16,6 +16,7 @@
     "references/scoring-and-windows.md",
     "references/test-integrity.md",
     "references/testing-quirks.md",
+    "scripts/mutate.mjs",
     "scripts/probe-dist-route.js"
   ],
   "frontmatter": {
