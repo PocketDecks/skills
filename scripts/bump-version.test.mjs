@@ -46,6 +46,18 @@ test("moves all four manifests together", (t) => {
   assert.equal(validator.status, 0, validator.stdout + validator.stderr);
 });
 
+test("rejects a truncated manifest without writing any file", (t) => {
+  const { dir, read, run } = fixture(t);
+  const file = path.join(dir, "package.json");
+  const text = fs.readFileSync(file, "utf8");
+  fs.writeFileSync(file, text.replace(/}\s*$/, ""));
+  const before = read();
+  const result = run("1.0.1");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /not valid JSON/);
+  assert.deepEqual(read(), before);
+});
+
 test("rejects a two-part version", (t) => {
   const { read, run } = fixture(t);
   const before = read();

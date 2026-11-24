@@ -26,6 +26,13 @@ try {
   const replacement = `"version": "${next}"`;
   const updates = FILES.map((file) => {
     const text = fs.readFileSync(file, "utf8");
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error(`${file}: not valid JSON`);
+    }
+    if (parsed.version !== current) throw new Error(`${file}: version is ${parsed.version}, expected ${current}`);
     if (text.split(needle).length - 1 !== 1) {
       throw new Error(`${file}: expected exactly one ${needle}`);
     }
