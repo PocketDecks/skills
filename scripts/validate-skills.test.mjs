@@ -304,3 +304,13 @@ test("reports a broken catalogue without throwing", () => {
   const problems = problemsAfter((root) => fs.writeFileSync(path.join(root, "skills", "index.json"), '{"skills": ['), { catalog: false });
   expectProblem(problems, /skills\/index\.json: out of date/);
 });
+
+test("rejects a publish manifest naming an unknown skill", () => {
+  const problems = problemsAfter((root) => editJson(root, "skills/publish-manifest.json", (json) => ({ ...json, skill: "no-such-skill" })));
+  expectProblem(problems, /is not a folder/);
+});
+
+test("rejects a publish manifest with a non-array list", () => {
+  const problems = problemsAfter((root) => editJson(root, "skills/publish-manifest.json", (json) => ({ ...json, published: "all" })));
+  expectProblem(problems, /published must be an array/);
+});

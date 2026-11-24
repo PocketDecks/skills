@@ -161,7 +161,7 @@ test("restores the file when the test command times out", (t) => {
   assert.deepEqual(fs.readFileSync(target), before);
 });
 
-test("restores the file when interrupted", async (t) => {
+test("restores the file when interrupted", { skip: process.platform === "win32" }, async (t) => {
   const { dir, target } = fixture(t);
   const before = fs.readFileSync(target);
   const marker = path.join(dir, "marker");
@@ -205,7 +205,7 @@ const stubRun = (t, drop) => {
   return spawnSync(process.execPath, [runner], {
     cwd: dir,
     encoding: "utf8",
-    env: { ...process.env, DROP_WRITE: drop, ARGV: JSON.stringify(argv) },
+    env: { ...process.env, ARGV: JSON.stringify(argv) },
   });
 };
 
@@ -221,4 +221,54 @@ test("reports a failed restore check", (t) => {
   assert.match(result.stderr, /restore verification failed/);
   const report = JSON.parse(result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
   assert.equal(report.killed, false);
+});
+
+test("refuses a zero timeout", (t) => {
+  const { target, invoke } = fixture(t);
+  const before = fs.readFileSync(target);
+  const { result } = invoke({ timeout: "0" });
+  assert.equal(result.status, 2);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
+
+test("refuses a non-numeric timeout", (t) => {
+  const { target, invoke } = fixture(t);
+  const before = fs.readFileSync(target);
+  const { result } = invoke({ timeout: "abc" });
+  assert.equal(result.status, 2);
+  assert.deepEqual(fs.readFileSync(target), before);
+});
+
+test("does not count a timed-out run as killed", (t) => {
+  const { dir, invoke } = fixture(t);
+  const slow = path.join(dir, "fail-then-sleep.cjs");
+  fs.writeFileSync(slow, 'process.stdout.write("\\u2716 keeps the limit at two\\n"); setTimeout(() => {}, 5000);\n');
+  const { result, report } = invoke({ timeout: "1", test: `node "${slow}"`, expect: "keeps the limit at two" });
+  assert.equal(result.status, 1);
+  assert.equal(report.timedOut, true);
+  assert.equal(report.matched, true);
+  assert.equal(report.killed, false);
+});
+
+test("removes its signal listeners", (t) => {
+  const { dir, target } = fixture(t);
+  const runner = path.join(dir, "listener.mjs");
+  const source = [
+    'import fs from "node:fs";',
+    `import { main } from ${JSON.stringify(script)};`,
+    'const before = process.listenerCount("SIGINT");',
+    'process.exitCode = await main(JSON.parse(process.env.ARGV));',
+    'process.stdout.write(JSON.stringify({ before, after: process.listenerCount("SIGINT") }) + "\\n");',
+    "",
+  ].join("\n");
+  fs.writeFileSync(runner, source);
+  const argv = ["--file", target, "--find", "= 2", "--replace", "= 3", "--test", 'node -e ""', "--expect", "no test name"];
+  const result = spawnSync(process.execPath, [runner], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, ARGV: JSON.stringify(argv) },
+  });
+  assert.equal(result.status, 1);
+  const counts = JSON.parse(result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
+  assert.equal(counts.after, counts.before);
 });
