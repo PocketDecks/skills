@@ -13,7 +13,7 @@ Run it for every test that claims to guard a behaviour
 5. Restore in a `finally` block, check each file equals its backup byte for byte, and check `git status --short` shows only intended changes
 6. Report the mutant and the test that failed. "21 passed" is not evidence
 
-Run the proof with `node <skill-dir>/scripts/mutate.mjs --file <path> --find <old> --replace <new> --test "<command>" --expect "<test name>" [--timeout <seconds>]`; it restores the file and prints one JSON line with killed, exit, matched, timedOut and interrupted, and recognises node:test, TAP and Vitest failure lines. Give `--expect` the complete test name or its Vitest suite path. The test command runs in its own process group, stopped on timeout or interrupt. For the tier-list suite, use `--test "yarn vitest run <file>"`
+Run the proof with `node <skill-dir>/scripts/mutate.mjs --file <path> --find <old> --replace <new> --test "<command>" --expect "<test name>" [--timeout <seconds>]`; it restores the file and prints one JSON line with killed, exit, matched, timedOut and interrupted, and recognises node:test, TAP and Vitest failure lines. Give `--expect` the complete test name or its Vitest suite path. The test command runs in its own process group, stopped on timeout or interrupt. For the tier-list suite, use `--test "yarn vitest run --reporter=verbose <file>"` and pass a suite path such as `limits > keeps the limit at two`, because the default reporter hides passing lines and cannot detect a name used by both a failing and a passing test. Such an ambiguous name is refused. TAP todo and skip lines are ignored
 
 Variations:
 

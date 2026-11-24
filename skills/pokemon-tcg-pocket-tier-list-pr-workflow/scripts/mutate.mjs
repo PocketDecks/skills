@@ -6,7 +6,10 @@
 // byte before the report is printed. It recognises node:test, TAP and Vitest
 // failure lines. Pass the complete test name to --expect, or its Vitest suite
 // path. The test command runs in its own process group, which is stopped on a
-// timeout or interrupt.
+// timeout or interrupt. For Vitest, run `yarn vitest run --reporter=verbose
+// <file>` and pass a suite path such as `limits > keeps the limit at two`. A
+// name that matches both a failing and a passing test is refused. TAP todo and
+// skip lines are ignored.
 //
 // Usage:
 //   node <skill-dir>/scripts/mutate.mjs --file <path> --find <text> \
@@ -24,19 +27,32 @@ export const countOccurrences = (text, needle) => text.split(needle).length - 1;
 
 export const stripAnsi = (text) => text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
 
-const FAILED_LINE = /^\s*(?:✖|×|not ok \d+ -|FAIL)\s+(.+?)\s*$/;
+const FAILED_LINE = /^\s*(✖|×|not ok \d+ -|FAIL)\s+(.+?)\s*$/;
+const PASSED_LINE = /^\s*(✔|✓|ok \d+ -)\s+(.+?)\s*$/;
+// Only Vitest prints suite paths joined with " > ".
+const SUITE_PATH_MARKERS = new Set(["×", "FAIL", "✓"]);
 const TIMING = /\s+(?:\(\d+(?:\.\d+)?ms\)|\d+(?:\.\d+)?m?s)$/;
-const TAP_DIRECTIVE = /\s+#\s.*$/;
+// A TAP line with a TODO or SKIP directive is not a result: a failing todo test
+// prints "not ok" but does not fail the run.
+const TAP_DIRECTIVE = /\s#\s*(?:TODO|SKIP)\b/i;
 
-export const failedTestIds = (output) =>
+const testLines = (output, pattern) =>
   stripAnsi(output)
     .split(/\r?\n/)
-    .map((line) => FAILED_LINE.exec(line)?.[1])
+    .map((line) => pattern.exec(line))
     .filter(Boolean)
-    .flatMap((id) => [...new Set([id, id.replace(TIMING, ""), id.replace(TAP_DIRECTIVE, "")])]);
+    .filter(([, marker, id]) => !(marker.endsWith("-") && TAP_DIRECTIVE.test(id)))
+    .map(([, marker, id]) => ({
+      suitePaths: SUITE_PATH_MARKERS.has(marker),
+      forms: [...new Set([id, id.replace(TIMING, "")])],
+    }));
 
-export const namesFailedTest = (output, name) =>
-  failedTestIds(output).some((id) => id === name || id.endsWith(` > ${name}`));
+const names = (line, name) =>
+  line.forms.some((form) => form === name || (line.suitePaths && form.endsWith(` > ${name}`)));
+
+export const namesFailedTest = (output, name) => testLines(output, FAILED_LINE).some((line) => names(line, name));
+
+export const namesPassedTest = (output, name) => testLines(output, PASSED_LINE).some((line) => names(line, name));
 
 const groupAlive = (pid) => {
   try {
@@ -168,6 +184,10 @@ export const main = async (argv, io = fs) => {
     const result = await running.done;
     report.exit = result.code === null ? 1 : result.code;
     report.matched = namesFailedTest(result.output, args.expect);
+    if (report.matched && namesPassedTest(result.output, args.expect)) {
+      report.matched = false;
+      throw new Error("--expect names both a failing and a passing test; use a unique name or the Vitest suite path");
+    }
     report.timedOut = result.timedOut;
     if (!result.treeExited) throw new Error("the test command left processes running");
     report.killed = !report.timedOut && report.exit !== 0 && report.matched;

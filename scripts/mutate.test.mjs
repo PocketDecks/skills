@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync, spawn } from "node:child_process";
-import { namesFailedTest, sameBytes } from "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs";
+import { namesFailedTest, namesPassedTest, sameBytes } from "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const script = path.resolve(here, "../skills/pokemon-tcg-pocket-tier-list-pr-workflow/scripts/mutate.mjs");
@@ -376,6 +376,60 @@ test("kills a descendant left by a timed-out command", { skip: process.platform 
   const pid = Number(fs.readFileSync(pidFile, "utf8"));
   await new Promise((resolve) => setTimeout(resolve, 200));
   assert.throws(() => process.kill(pid, 0), (error) => error.code === "ESRCH");
+});
+
+test("ignores a failing TAP todo line", (t) => {
+  const { dir, invoke } = fixture(t);
+  assert.equal(namesFailedTest("not ok 1 - keeps the limit at two # TODO pending fix", "keeps the limit at two"), false);
+  assert.equal(namesFailedTest("not ok 1 - keeps the limit at two # TODO pending fix", "keeps the limit at two # TODO pending fix"), false);
+  const check = path.join(dir, "todo.test.mjs");
+  fs.writeFileSync(check, [
+    'import test from "node:test";',
+    'import assert from "node:assert/strict";',
+    'import { limit } from "./target.mjs";',
+    'test("keeps the limit at two", { todo: "pending fix" }, () => assert.equal(limit, 3));',
+    'test("other check", () => assert.equal(limit, 3));',
+    "",
+  ].join("\n"));
+  const { result, report } = invoke({ test: `node --test --test-reporter=tap "${check}"`, expect: "keeps the limit at two" });
+  assert.equal(result.status, 1);
+  assert.equal(report.killed, false);
+});
+
+test("refuses a name used by a passing and a failing test", (t) => {
+  const { dir, invoke } = fixture(t);
+  const target = path.join(dir, "duplicate-target.mjs");
+  fs.writeFileSync(target, "export const a = 1;\nexport const b = 2;\n");
+  const check = path.join(dir, "duplicate.test.mjs");
+  fs.writeFileSync(check, [
+    'import test, { describe } from "node:test";',
+    'import assert from "node:assert/strict";',
+    'import { a, b } from "./duplicate-target.mjs";',
+    'describe("A", () => test("rejects empty", () => assert.equal(a, 1)));',
+    'describe("B", () => test("rejects empty", () => assert.equal(b, 2)));',
+    "",
+  ].join("\n"));
+  const { result, output } = invoke({
+    file: target, find: "b = 2", replace: "b = 3",
+    test: `node --test "${check}"`, expect: "rejects empty",
+  });
+  assert.equal(result.status, 2);
+  assert.match(output, /names both a failing and a passing test/);
+});
+
+test("matches captured Vitest verbose lines", () => {
+  const output = [
+    " ✓ dup.test.ts > A > rejects empty 1ms",
+    " × dup.test.ts > B > rejects empty 2ms",
+    " FAIL  dup.test.ts > B > rejects empty",
+  ].join("\n");
+  assert.equal(namesPassedTest(output, "rejects empty"), true);
+  assert.equal(namesPassedTest(output, "B > rejects empty"), false);
+  assert.equal(namesFailedTest(output, "B > rejects empty"), true);
+});
+
+test("does not apply suite paths to TAP names", () => {
+  assert.equal(namesFailedTest("not ok 2 - longer > keeps the limit at two", "keeps the limit at two"), false);
 });
 
 test("kills a background straggler after a normal exit", { skip: process.platform === "win32" }, async (t) => {
