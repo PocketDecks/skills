@@ -344,10 +344,7 @@ const checkPublishManifest = (root, names, problems) => {
     problems.push(`${relative}: published must be an array`);
     return;
   }
-  const catalogPath = path.join(root, CATALOG);
-  if (!fs.existsSync(catalogPath)) return;
-  const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf8"));
-  const expected = catalog.skills.find((entry) => entry.name === manifest.skill)?.files ?? [];
+  const expected = buildCatalog(root).skills.find((entry) => entry.name === manifest.skill)?.files ?? [];
   const listed = new Set(manifest.published);
   const wanted = new Set(expected);
   for (const file of expected) {

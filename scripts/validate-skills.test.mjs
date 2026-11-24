@@ -299,3 +299,8 @@ test("rejects a publish manifest with an extra file", () => {
   })));
   expectProblem(problems, /publish-manifest\.json: extra scripts\/extra\.mjs/);
 });
+
+test("reports a broken catalogue without throwing", () => {
+  const problems = problemsAfter((root) => fs.writeFileSync(path.join(root, "skills", "index.json"), '{"skills": ['), { catalog: false });
+  expectProblem(problems, /skills\/index\.json: out of date/);
+});
